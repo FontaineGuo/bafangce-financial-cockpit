@@ -1,9 +1,11 @@
 [project]
 name = "bafangce-financial-cockpit"
 version = "0.1.0"
-description = "Add your description here"
+description = "Personal financial cockpit"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "akshare>=1.17.91",
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
 ]
