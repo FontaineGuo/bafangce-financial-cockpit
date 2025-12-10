@@ -1,0 +1,40 @@
+# 数据目录
+/data/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# Python编译文件
+__pycache__/
+*.py[cod]
+
+# 日志文件
+*.log
+logs/
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# IDE相关文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 构建和部署文件
+build/
+dist/
+*.egg-info/
+
+# 测试覆盖率报告
+.coverage
+htmlcov/

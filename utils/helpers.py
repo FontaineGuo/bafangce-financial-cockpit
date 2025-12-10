@@ -23,11 +23,23 @@ def normalize_number(value):
         value: 需要规范化的数值，可以是科学计数法字符串或数值类型
     
     Returns:
-        float: 规范化后的数值，保留小数点后5位
+        float: 规范化后的数值，保留小数点后5位；如果无法转换则返回None
     """
-    # 如果是字符串类型，先转换为浮点数
+    # 处理None值
+    if value is None:
+        return None
+    
+    # 如果是字符串类型，先尝试转换为浮点数
     if isinstance(value, str):
-        value = float(value)
+        try:
+            value = float(value)
+        except ValueError:
+            # 如果字符串无法转换为浮点数，返回None
+            return None
+    
+    # 检查是否为数值类型
+    if not isinstance(value, (int, float)):
+        return None
     
     # 保留小数点后5位
     return round(value, 5)
