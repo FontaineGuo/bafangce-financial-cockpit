@@ -6,56 +6,196 @@ import datetime
 
 # 将项目根目录添加到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.helpers import normalize_number
+from utils.helpers import normalize_number, is_trading_day
 
-def get_stock_data(stock_code):
+def get_stock_update_action(stock_code):
     """
-    使用AKSHARE库获取A股股票实时数据
+    根据当前时间和数据状态决定股票数据的更新动作
+    
+    Args:
+        stock_code (str): 股票代码
+    
+    Returns:
+        str: 更新动作，可能的值为：
+            - "use_cache": 使用缓存
+            - "fetch_once": 获取一次
+            - "fetch_realtime": 获取实时数据
+    """
+    today = datetime.date.today()
+    current_time = datetime.datetime.now().time()
+    
+    # 1. 检查交易日状态
+    if not is_trading_day(today):
+        if has_stock_data(stock_code):
+            return "use_cache"  # 使用缓存
+        else:
+            return "fetch_once"  # 获取一次
+    
+    # 2. 检查交易时间段
+    trading_start = datetime.time(9, 30)
+    trading_end = datetime.time(15, 0)
+    
+    if trading_start <= current_time <= trading_end:
+        # 交易时间：检查最后更新时间
+        last_update = get_stock_last_update_time(stock_code)
+        if last_update and (datetime.datetime.now() - last_update).total_seconds() < 300:  # 5分钟
+            return "use_cache"  # 使用缓存
+        else:
+            return "fetch_realtime"  # 获取实时
+    
+    else:
+        # 非交易时间
+        if has_stock_data(stock_code):
+            return "use_cache"  # 使用缓存
+        else:
+            return "fetch_once"  # 获取一次
+
+def has_stock_data(stock_code):
+    """
+    检查数据库中是否已有该股票的数据
+    
+    Args:
+        stock_code (str): 股票代码
+    
+    Returns:
+        bool: True表示有数据，False表示没有数据
+    """
+    from core.database import get_stock_by_code
+    try:
+        result = get_stock_by_code(stock_code)
+        return result is not None
+    except Exception:
+        # 如果表不存在或其他错误，返回False
+        return False
+
+def get_stock_last_update_time(stock_code):
+    """
+    获取指定股票数据的最后更新时间
+    
+    Args:
+        stock_code (str): 股票代码
+    
+    Returns:
+        datetime.datetime or None: 最后更新时间，如果没有数据则返回None
+    """
+    from core.database import get_stock_last_update_time as db_get_last_update
+    try:
+        return db_get_last_update(stock_code)
+    except Exception:
+        # 如果表不存在或其他错误，返回None
+        return None
+
+def get_stock_data(stock_code, force_update=False):
+    """
+    使用AKSHARE库获取A股股票实时数据，并支持缓存策略
     
     Args:
         stock_code (str): A股股票代码，例如 "000001"
+        force_update (bool): 是否强制更新数据
     
     Returns:
-        dict: 股票实时数据，数值已规范化到小数点后5位
+        dict: 股票实时数据，以key-value pair形式返回
     """
     try:
-        # 获取股票实时买卖五档数据
-        stock_data = ak.stock_bid_ask_em(symbol=stock_code)
+        # 先导入数据库模块
+        from core.database import create_tables, get_stock_by_code, insert_or_update_stock_data
+        
+        # 创建数据库表（如果不存在）
+        create_tables()
+        
+        # 如果强制更新，则直接获取新数据
+        if force_update:
+            print(f"强制更新股票 {stock_code} 数据")
+            return fetch_and_store_stock_data(stock_code)
+            
+        # 决定更新动作
+        action = get_stock_update_action(stock_code)
+        print(f"股票 {stock_code} 更新动作: {action}")
+        
+        if action == "use_cache":
+            # 使用缓存数据
+            result = get_stock_by_code(stock_code)
+            if result:
+                print(f"使用股票 {stock_code} 的缓存数据")
+                return result
+            else:
+                # 如果缓存中没有数据，获取一次
+                print(f"股票 {stock_code} 缓存中没有数据，获取一次")
+                return fetch_and_store_stock_data(stock_code)
+        elif action in ["fetch_once", "fetch_realtime"]:
+            # 获取新数据
+            print(f"获取股票 {stock_code} 新数据: {action}")
+            return fetch_and_store_stock_data(stock_code)
+        else:
+            # 默认使用缓存
+            result = get_stock_by_code(stock_code)
+            if result:
+                print(f"使用股票 {stock_code} 默认缓存数据")
+                return result
+            else:
+                print(f"默认获取股票 {stock_code} 数据")
+                return fetch_and_store_stock_data(stock_code)
+        
+    except Exception as e:
+        print(f"获取股票数据时出错: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def fetch_and_store_stock_data(stock_code):
+    """
+    获取并存储指定股票的数据
+    
+    Args:
+        stock_code (str): 股票代码
+    
+    Returns:
+        dict: 存储的股票数据，如果获取失败则返回None
+    """
+    print(f"开始获取股票 {stock_code} 的数据...")
+    try:
+        # 使用AKSHARE获取股票数据
+        print(f"使用AKSHARE获取股票 {stock_code} 数据...")
+        stock_data = ak.stock_individual_info_em(symbol=stock_code)
         
         # 如果是DataFrame类型，转换为字典
         if hasattr(stock_data, 'to_dict'):
             # 将DataFrame转换为以'item'为键，'value'为值的字典
             stock_data = dict(zip(stock_data['item'], stock_data['value']))
         
-        # 规范化数值格式
-        normalized_data = {}
-        for key, value in stock_data.items():
-            try:
-                normalized_data[key] = normalize_number(value)
-            except Exception as e:
-                # 如果无法转换，保留原始值
-                normalized_data[key] = value
+        # 转换数据格式以适应数据库存储
+        db_stock_data = {
+            'stock_code': stock_code,
+            'stock_name': stock_data.get('股票简称', ''),
+            'current_price': stock_data.get('最新'),
+            'total_shares': stock_data.get('总股本'),
+            'circulating_shares': stock_data.get('流通股'),
+            'total_market_value': stock_data.get('总市值'),
+            'circulating_market_value': stock_data.get('流通市值'),
+            'industry': stock_data.get('行业'),
+            'listing_date': stock_data.get('上市时间')
+        }
         
-        return normalized_data
+        # 存储到数据库
+        from core.database import insert_or_update_stock_data
+        insert_or_update_stock_data(db_stock_data)
+        print(f"股票 {stock_code} 数据已存储到数据库")
+        
+        # 返回数据库中的数据
+        from core.database import get_stock_by_code
+        return get_stock_by_code(stock_code)
+        
     except Exception as e:
-        print(f"获取股票数据时出错: {e}")
-        return None
+        print(f"获取股票 {stock_code} 数据时出错: {e}")
+        import traceback
+        traceback.print_exc()
+        # 如果获取失败，尝试返回数据库中已有的数据
+        from core.database import get_stock_by_code
+        return get_stock_by_code(stock_code)
 
-def is_trading_day(date):
-    """
-    判断指定日期是否为交易日
-    
-    Args:
-        date (datetime.date): 要判断的日期
-    
-    Returns:
-        bool: True表示是交易日，False表示非交易日
-    """
-    # 简单实现：周一到周五为交易日，周末为非交易日
-    # 实际应用中应该调用专门的交易日API或使用预定义的交易日历
-    return date.weekday() < 5
 
-def get_last_update_time(fund_code):
+
+def get_fund_last_update_time(fund_code):
     """
     获取指定基金数据的最后更新时间
     
@@ -78,15 +218,15 @@ def get_last_update_time(fund_code):
         return datetime.datetime.strptime(result[0][0], '%Y-%m-%d %H:%M:%S')
     return None
 
-def has_todays_data(fund_code):
+def has_fund_data(fund_code):
     """
-    检查是否已有今日的数据
+    检查数据库中是否已有该基金的数据
     
     Args:
         fund_code (str): 基金代码
     
     Returns:
-        bool: True表示有今日数据，False表示没有
+        bool: True表示有数据，False表示没有数据
     """
     from core.database import execute_query
     today = datetime.date.today().strftime('%Y-%m-%d')
@@ -97,9 +237,9 @@ def has_todays_data(fund_code):
     result = execute_query(query, (fund_code, today))
     return result[0][0] > 0
 
-def decide_update_action(fund_code):
+def get_fund_update_action(fund_code):
     """
-    根据当前时间和数据状态决定更新动作
+    根据当前时间和数据状态决定基金数据的更新动作
     
     Args:
         fund_code (str): 基金代码
@@ -113,11 +253,11 @@ def decide_update_action(fund_code):
     """
     today = datetime.date.today()
     current_time = datetime.datetime.now().time()
-    last_update = get_last_update_time(fund_code)
+    last_update = get_fund_last_update_time(fund_code)
     
     # 1. 检查交易日状态
     if not is_trading_day(today):
-        if has_todays_data(fund_code):
+        if has_fund_data(fund_code):
             return "use_cache"  # 使用缓存
         else:
             return "fetch_once"  # 获取一次
@@ -372,8 +512,8 @@ def get_fund_data(fund_code, force_update=False):
             return fetch_and_store_fund_data(fund_code)
             
         # 决定更新动作
-        action = decide_update_action(fund_code)
-        print(f"决定更新动作: {action}")
+        action = get_fund_update_action(fund_code)
+        print(f"基金 {fund_code} 更新动作: {action}")
         
         if action == "use_cache":
             # 使用缓存数据
@@ -437,7 +577,16 @@ def test_get_stock_data():
     
     if stock_data is not None:
         print("股票实时数据获取成功:")
-        print(stock_data)
+        print(f"股票代码: {stock_data['stock_code']}")
+        print(f"股票名称: {stock_data['stock_name']}")
+        print(f"当前价格: {stock_data['current_price']}")
+        print(f"总股本: {stock_data['total_shares']}")
+        print(f"流通股本: {stock_data['circulating_shares']}")
+        print(f"总市值: {stock_data['total_market_value']}")
+        print(f"流通市值: {stock_data['circulating_market_value']}")
+        print(f"所属行业: {stock_data['industry']}")
+        print(f"上市日期: {stock_data['listing_date']}")
+        print(f"更新时间: {stock_data['update_time']}")
     else:
         print("股票实时数据获取失败")
 

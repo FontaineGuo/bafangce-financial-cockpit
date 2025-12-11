@@ -43,3 +43,17 @@ def normalize_number(value):
     
     # 保留小数点后5位
     return round(value, 5)
+
+def is_trading_day(date):
+    """
+    判断指定日期是否为交易日
+    
+    Args:
+        date (datetime.date): 要判断的日期
+    
+    Returns:
+        bool: True表示是交易日，False表示非交易日
+    """
+    # 简单实现：周一到周五为交易日，周末为非交易日
+    # 实际应用中应该调用专门的交易日API或使用预定义的交易日历
+    return date.weekday() < 5

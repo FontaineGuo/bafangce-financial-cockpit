@@ -22,7 +22,7 @@ bafangce-finacial-cockpit/
 ├── core/
 │   ├── __init__.py
 │   ├── data_fetcher.py  # 数据获取模块
-│   ├── portfolio.py     # 持仓管理模块
+│   ├── holdings_manager.py     # 持仓管理模块
 │   ├── calculator.py    # 计算模块
 │   └── database.py      # 数据库操作
 ├── ui/
