@@ -29,6 +29,13 @@ class Holding:
         """总盈利"""
         return self.current_total - self.cost_total
     
+    @property
+    def profit_rate(self):
+        """盈利率"""
+        if self.cost_total and self.cost_total > 0:
+            return self.profit_total / self.cost_total
+        return 0
+    
     def to_dict(self):
         """转换为字典"""
         return {

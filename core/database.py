@@ -47,10 +47,28 @@ def create_tables():
         )
     ''')
     
+    # 创建ETF数据表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS etf_data (
+            etf_code TEXT PRIMARY KEY,
+            etf_name TEXT NOT NULL,
+            type TEXT,
+            net_value FLOAT,
+            total_net_value FLOAT,
+            prev_net_value FLOAT,
+            prev_total_net_value FLOAT,
+            growth_value FLOAT,
+            growth_rate FLOAT,
+            market_price FLOAT,
+            discount_rate FLOAT,
+            update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     # 创建持仓数据表
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS holdings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY,
             product_code TEXT NOT NULL,
             product_name TEXT NOT NULL,
             product_type TEXT NOT NULL,
@@ -195,6 +213,115 @@ def get_fund_by_code(fund_code):
         return dict(zip(columns, result[0]))
     return None
 
+def insert_or_update_etf_data(etf_data, conn=None):
+    """
+    插入或更新ETF数据
+    
+    Args:
+        etf_data (dict): ETF数据字典
+        conn (sqlite3.Connection, optional): 数据库连接对象
+    """
+    query = '''
+        INSERT OR REPLACE INTO etf_data (
+            etf_code, etf_name, type, net_value, total_net_value, 
+            prev_net_value, prev_total_net_value, growth_value, 
+            growth_rate, market_price, discount_rate, update_time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    '''
+    
+    params = (
+        etf_data['etf_code'],
+        etf_data['etf_name'],
+        etf_data.get('type'),
+        etf_data.get('net_value'),
+        etf_data.get('total_net_value'),
+        etf_data.get('prev_net_value'),
+        etf_data.get('prev_total_net_value'),
+        etf_data.get('growth_value'),
+        etf_data.get('growth_rate'),
+        etf_data.get('market_price'),
+        etf_data.get('discount_rate')
+    )
+    
+    # 如果提供了连接，则使用该连接，否则创建新连接
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+    else:
+        with connect_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            conn.commit()
+
+def get_etf_by_code(etf_code):
+    """
+    根据ETF代码获取ETF数据
+    
+    Args:
+        etf_code (str): ETF代码
+    
+    Returns:
+        dict: ETF数据字典，如果不存在则返回None
+    """
+    
+    query = '''
+        SELECT * FROM etf_data 
+        WHERE etf_code = ?
+    '''
+    
+    result = execute_query(query, (etf_code,))
+    if result:
+        # 将查询结果转换为字典
+        columns = ['etf_code', 'etf_name', 'type', 'net_value', 'total_net_value', 
+                  'prev_net_value', 'prev_total_net_value', 'growth_value', 
+                  'growth_rate', 'market_price', 'discount_rate', 'update_time']
+        return dict(zip(columns, result[0]))
+    return None
+
+def batch_insert_etf_data(etf_data_list, conn=None):
+    """
+    批量插入或更新ETF数据
+    
+    Args:
+        etf_data_list (list): ETF数据字典列表
+        conn (sqlite3.Connection, optional): 数据库连接对象
+    """
+    query = '''
+        INSERT OR REPLACE INTO etf_data (
+            etf_code, etf_name, type, net_value, total_net_value, 
+            prev_net_value, prev_total_net_value, growth_value, 
+            growth_rate, market_price, discount_rate, update_time
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    '''
+    
+    # 准备参数列表
+    params_list = []
+    for etf_data in etf_data_list:
+        params = (
+            etf_data['etf_code'],
+            etf_data['etf_name'],
+            etf_data.get('type'),
+            etf_data.get('net_value'),
+            etf_data.get('total_net_value'),
+            etf_data.get('prev_net_value'),
+            etf_data.get('prev_total_net_value'),
+            etf_data.get('growth_value'),
+            etf_data.get('growth_rate'),
+            etf_data.get('market_price'),
+            etf_data.get('discount_rate')
+        )
+        params_list.append(params)
+    
+    # 如果提供了连接，则使用该连接，否则创建新连接
+    if conn:
+        cursor = conn.cursor()
+        cursor.executemany(query, params_list)
+    else:
+        with connect_db() as conn:
+            cursor = conn.cursor()
+            cursor.executemany(query, params_list)
+            conn.commit()
+
 def insert_or_update_stock_data(stock_data, conn=None):
     """
     插入或更新股票数据
@@ -282,7 +409,7 @@ def get_stock_last_update_time(stock_code):
 
 def add_holding_to_db(holding):
     """
-    向数据库添加持仓记录
+    向数据库添加持仓记录，重用已删除的ID
     
     Args:
         holding (Holding): 持仓对象
@@ -290,14 +417,45 @@ def add_holding_to_db(holding):
     Returns:
         int: 插入记录的ID
     """
+    conn = connect_db()
+    cursor = conn.cursor()
+    
+    # 首先检查ID=1是否可用
+    query = "SELECT id FROM holdings WHERE id = 1"
+    cursor.execute(query)
+    if not cursor.fetchone():
+        # 如果ID=1不存在，直接使用1
+        available_id = 1
+    else:
+        # 如果ID=1存在，查找第一个不连续的ID
+        query = '''
+            SELECT id + 1 AS next_id FROM holdings 
+            WHERE NOT EXISTS (SELECT 1 FROM holdings h2 WHERE h2.id = holdings.id + 1) 
+            ORDER BY id ASC LIMIT 1
+        '''
+        cursor.execute(query)
+        next_id = cursor.fetchone()
+        
+        if next_id:
+            # 如果找到不连续的ID，使用该ID
+            available_id = next_id[0]
+        else:
+            # 如果没有找到（所有ID都是连续的），使用最大ID+1
+            query = "SELECT MAX(id) FROM holdings"
+            cursor.execute(query)
+            max_id = cursor.fetchone()[0]
+            available_id = 1 if max_id is None else max_id + 1
+    
+    # 使用找到的可用ID插入记录
     query = '''
         INSERT INTO holdings (
-            product_code, product_name, product_type, 
+            id, product_code, product_name, product_type, 
             quantity, purchase_price, current_price
-        ) VALUES (?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
     '''
     
     params = (
+        available_id,
         holding.product_code,
         holding.product_name,
         holding.product_type,
@@ -306,16 +464,12 @@ def add_holding_to_db(holding):
         holding.current_price
     )
     
-    conn = connect_db()
-    cursor = conn.cursor()
     cursor.execute(query, params)
     conn.commit()
     
-    # 获取插入记录的ID
-    inserted_id = cursor.lastrowid
     conn.close()
     
-    return inserted_id
+    return available_id
 
 def get_all_holdings_from_db():
     """

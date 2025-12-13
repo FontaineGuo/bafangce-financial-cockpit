@@ -237,6 +237,91 @@ def has_fund_data(fund_code):
     result = execute_query(query, (fund_code, today))
     return result[0][0] > 0
 
+# ETF相关辅助函数
+def get_etf_last_update_time(etf_code):
+    """
+    获取指定ETF数据的最后更新时间
+    
+    Args:
+        etf_code (str): ETF代码
+    
+    Returns:
+        datetime.datetime or None: 最后更新时间，如果没有数据则返回None
+    """
+    from core.database import execute_query
+    query = '''
+        SELECT update_time FROM etf_data 
+        WHERE etf_code = ? 
+        ORDER BY update_time DESC 
+        LIMIT 1
+    '''
+    result = execute_query(query, (etf_code,))
+    if result:
+        # SQLite的TIMESTAMP类型返回的是字符串，需要转换为datetime
+        return datetime.datetime.strptime(result[0][0], '%Y-%m-%d %H:%M:%S')
+    return None
+
+def has_etf_data(etf_code):
+    """
+    检查数据库中是否已有该ETF的数据
+    
+    Args:
+        etf_code (str): ETF代码
+    
+    Returns:
+        bool: True表示有数据，False表示没有数据
+    """
+    from core.database import execute_query
+    today = datetime.date.today().strftime('%Y-%m-%d')
+    query = '''
+        SELECT COUNT(*) FROM etf_data 
+        WHERE etf_code = ? AND DATE(update_time) = ?
+    '''
+    result = execute_query(query, (etf_code, today))
+    return result[0][0] > 0
+
+def get_etf_update_action(etf_code):
+    """
+    根据当前时间和数据状态决定ETF数据的更新动作
+    
+    Args:
+        etf_code (str): ETF代码
+    
+    Returns:
+        str: 更新动作，可能的值为：
+            - "use_cache": 使用缓存
+            - "fetch_once": 获取一次
+            - "fetch_realtime": 获取实时数据
+    """
+    today = datetime.date.today()
+    current_time = datetime.datetime.now().time()
+    last_update = get_etf_last_update_time(etf_code)
+    
+    # 1. 检查交易日状态
+    if not is_trading_day(today):
+        if has_etf_data(etf_code):
+            return "use_cache"  # 使用缓存
+        else:
+            return "fetch_once"  # 获取一次
+    
+    # 2. 检查交易时间段
+    trading_start = datetime.time(9, 30)
+    trading_end = datetime.time(15, 0)
+    
+    if trading_start <= current_time <= trading_end:
+        # 交易时间：检查最后更新时间
+        if last_update and (datetime.datetime.now() - last_update).total_seconds() < 300:  # 5分钟
+            return "use_cache"  # 使用缓存
+        else:
+            return "fetch_realtime"  # 获取实时
+    
+    else:
+        # 非交易时间
+        if has_etf_data(etf_code):
+            return "use_cache"  # 使用缓存
+        else:
+            return "fetch_once"  # 获取一次
+
 def get_fund_update_action(fund_code):
     """
     根据当前时间和数据状态决定基金数据的更新动作
@@ -319,21 +404,37 @@ def parse_fund_row(row):
     if net_value_fields:
         # 按日期排序，最新的日期在前面
         net_value_fields.sort(key=get_date_from_key, reverse=True)
-        # 最新的日期是当日净值
-        net_value = row[net_value_fields[0]]
-        # 如果有多个日期字段，第二新的是前交易日净值
-        if len(net_value_fields) > 1:
-            prev_net_value = row[net_value_fields[1]]
+        
+        # 尝试获取最新的有效单位净值
+        for i, field in enumerate(net_value_fields):
+            temp_value = normalize_number(row[field])
+            if temp_value is not None:
+                net_value = row[field]
+                # 如果不是第一个字段（最新的），则前一个字段就是上一交易日净值
+                if i > 0:
+                    prev_net_value = row[net_value_fields[i-1]]
+                # 如果是第一个字段，且有多个字段，则第二个字段是上一交易日净值
+                elif len(net_value_fields) > 1:
+                    prev_net_value = row[net_value_fields[1]]
+                break
     
     # 处理累计净值字段
     if total_net_value_fields:
         # 按日期排序，最新的日期在前面
         total_net_value_fields.sort(key=get_date_from_key, reverse=True)
-        # 最新的日期是当日累计净值
-        total_net_value = row[total_net_value_fields[0]]
-        # 如果有多个日期字段，第二新的是前交易日累计净值
-        if len(total_net_value_fields) > 1:
-            prev_total_net_value = row[total_net_value_fields[1]]
+        
+        # 尝试获取最新的有效累计净值
+        for i, field in enumerate(total_net_value_fields):
+            temp_value = normalize_number(row[field])
+            if temp_value is not None:
+                total_net_value = row[field]
+                # 如果不是第一个字段（最新的），则前一个字段就是上一交易日累计净值
+                if i > 0:
+                    prev_total_net_value = row[total_net_value_fields[i-1]]
+                # 如果是第一个字段，且有多个字段，则第二个字段是上一交易日累计净值
+                elif len(total_net_value_fields) > 1:
+                    prev_total_net_value = row[total_net_value_fields[1]]
+                break
     
     return {
         'fund_code': row['基金代码'],
@@ -440,41 +541,13 @@ def fetch_and_store_fund_data(fund_code):
         # 检查是否找到指定基金
         if fund_code not in df['基金代码'].values:
             print(f"未找到基金代码为 {fund_code} 的数据")
-            # 使用模拟数据继续测试
-            print("使用模拟数据进行测试")
-            raise Exception("未找到指定基金数据，切换到模拟模式")
+            return None
         
         print(f"基金 {fund_code} 数据已存储到数据库")
         
     except Exception as e:
-        # 使用模拟数据进行测试
-        print(f"无法获取真实基金数据，使用模拟数据进行测试: {e}")
-        # 创建模拟数据，模拟akshare返回的真实数据格式（包含日期字段）
-        today = datetime.date.today().strftime('%Y-%m-%d')
-        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
-        
-        # 已经定义了顶级的parse_fund_row函数，直接使用它
-        
-        # 创建并插入模拟数据
-        mock_row = {
-            '基金代码': fund_code,
-            '基金简称': '华夏成长混合',
-            f'{today}-单位净值': 1.059,
-            f'{today}-累计净值': 3.632,
-            f'{yesterday}-单位净值': 1.058,
-            f'{yesterday}-累计净值': 3.631,
-            '日增长值': 0.001,
-            '日增长率': 0.094,
-            '申购状态': '开放申购',
-            '赎回状态': '开放赎回',
-            '手续费': '0.15%'
-        }
-        
-        fund_data = parse_fund_row(mock_row)
-        from core.database import insert_fund_data
-        insert_fund_data(fund_data)
-        print(f"模拟基金 {fund_code} 数据已存储到数据库")
-        print(f"使用模拟数据: {mock_row}")
+        print(f"获取基金 {fund_code} 数据时出错: {e}")
+        return None
     
     # 返回指定基金的数据
     from core.database import get_fund_by_code
@@ -545,86 +618,177 @@ def get_fund_data(fund_code, force_update=False):
         traceback.print_exc()
         return None
 
-def get_realtime_data(product_type, code):
+def fetch_and_store_etf_data(etf_code):
     """
-    获取实时数据的统一接口
+    获取并存储指定ETF的数据
     
     Args:
-        product_type (str): 产品类型，例如 "stock" 或 "fund"
-        code (str): 产品代码
+        etf_code (str): ETF代码
     
     Returns:
-        dict: 产品实时数据
+        dict: 存储的ETF数据，如果获取失败则返回None
     """
-    if product_type == "stock":
-        return get_stock_data(code)
-    elif product_type == "fund":
-        return get_fund_data(code)
-    else:
-        print(f"不支持的产品类型: {product_type}")
+    print(f"开始获取ETF {etf_code} 的数据...")
+    try:
+        # 使用AKSHARE获取ETF数据
+        print("使用AKSHARE获取ETF数据...")
+        df = ak.fund_etf_fund_daily_em()
+        print(f"成功获取 {len(df)} 条ETF数据")
+        print(f"DataFrame列名: {list(df.columns)}")
+        
+        # 查找指定ETF代码
+        etf_df = df[df['基金代码'] == etf_code]
+        if etf_df.empty:
+            print(f"未找到ETF代码为 {etf_code} 的数据")
+            return None
+        
+        # 转换为字典
+        etf_data = etf_df.iloc[0].to_dict()
+        
+        # 动态识别列名
+        net_value_col = None
+        total_net_value_col = None
+        prev_net_value_col = None
+        prev_total_net_value_col = None
+        
+        for key in etf_data.keys():
+            if '-单位净值' in key and not net_value_col:
+                net_value_col = key
+            elif '-累计净值' in key and not total_net_value_col:
+                total_net_value_col = key
+            elif '-前单位净值' in key or ('-单位净值' in key and net_value_col):
+                prev_net_value_col = key
+            elif '-前累计净值' in key or ('-累计净值' in key and total_net_value_col):
+                prev_total_net_value_col = key
+        
+        # 存储到数据库
+        from core.database import insert_or_update_etf_data
+        db_etf_data = {
+            'etf_code': etf_data['基金代码'],
+            'etf_name': etf_data['基金简称'],
+            'type': etf_data['类型'],
+            'net_value': normalize_number(etf_data.get(net_value_col)),
+            'total_net_value': normalize_number(etf_data.get(total_net_value_col)),
+            'prev_net_value': normalize_number(etf_data.get(prev_net_value_col)),
+            'prev_total_net_value': normalize_number(etf_data.get(prev_total_net_value_col)),
+            'growth_value': normalize_number(etf_data.get('增长值')),
+            'growth_rate': normalize_number(etf_data.get('增长率')),
+            'market_price': normalize_number(etf_data.get('市价')),
+            'discount_rate': normalize_number(etf_data.get('折价率'))
+        }
+        
+        insert_or_update_etf_data(db_etf_data)
+        print(f"ETF {etf_code} 数据已存储到数据库")
+        
+        # 返回数据库中的数据
+        from core.database import get_etf_by_code
+        return get_etf_by_code(etf_code)
+        
+    except Exception as e:
+        print(f"获取ETF {etf_code} 数据时出错: {e}")
+        import traceback
+        traceback.print_exc()
+        # 如果获取失败，尝试返回数据库中已有的数据
+        from core.database import get_etf_by_code
+        return get_etf_by_code(etf_code)
+
+def get_etf_data(etf_code, force_update=False):
+    """
+    获取指定ETF的数据，并根据缓存策略决定是否更新
+    
+    Args:
+        etf_code (str): ETF代码
+        force_update (bool): 是否强制更新数据
+    
+    Returns:
+        dict: ETF数据
+    """
+    # 先导入数据库模块
+    try:
+        from core.database import create_tables, get_etf_by_code
+    except Exception as e:
+        print(f"导入数据库模块出错: {e}")
+        return None
+    
+    try:
+        # 创建数据库表（如果不存在）
+        create_tables()
+        
+        # 如果强制更新，则直接获取新数据
+        if force_update:
+            print("强制更新数据")
+            return fetch_and_store_etf_data(etf_code)
+            
+        # 决定更新动作
+        action = get_etf_update_action(etf_code)
+        print(f"ETF {etf_code} 更新动作: {action}")
+        
+        if action == "use_cache":
+            # 使用缓存数据
+            result = get_etf_by_code(etf_code)
+            if result:
+                print("使用缓存数据")
+                return result
+            else:
+                # 如果缓存中没有数据，获取一次
+                print("缓存中没有数据，获取一次")
+                return fetch_and_store_etf_data(etf_code)
+        elif action in ["fetch_once", "fetch_realtime"]:
+            # 获取新数据
+            print(f"获取新数据: {action}")
+            return fetch_and_store_etf_data(etf_code)
+        else:
+            # 默认使用缓存
+            result = get_etf_by_code(etf_code)
+            if result:
+                print("使用默认缓存数据")
+                return result
+            else:
+                print("默认获取数据")
+                return fetch_and_store_etf_data(etf_code)
+        
+    except Exception as e:
+        print(f"获取ETF数据时出错: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
-
-def test_get_stock_data():
+def get_realtime_data(product_code, use_cache=True):
     """
-    测试方法：获取A股股票实时数据
+    统一获取实时数据接口，自动判断产品类型（股票 > ETF > 基金）
+    
+    Args:
+        product_code (str): 产品代码
+        use_cache (bool): 是否使用缓存
+    
+    Returns:
+        tuple: (产品类型, 产品数据)
     """
-    # 测试股票代码，例如平安银行(000001) 或常熟银行(601127)
-    test_stock_code = "601127"
+    print(f"开始获取产品 {product_code} 的实时数据")
     
-    print(f"正在获取股票 {test_stock_code} 的实时数据...")
-    stock_data = get_stock_data(test_stock_code)
+    # 1. 先尝试获取股票数据
+    print("1. 尝试获取股票数据")
+    stock_data = get_stock_data(product_code, force_update=not use_cache)
+    if stock_data:
+        print(f"成功获取股票 {product_code} 的数据")
+        return ('stock', stock_data)
     
-    if stock_data is not None:
-        print("股票实时数据获取成功:")
-        print(f"股票代码: {stock_data['stock_code']}")
-        print(f"股票名称: {stock_data['stock_name']}")
-        print(f"当前价格: {stock_data['current_price']}")
-        print(f"总股本: {stock_data['total_shares']}")
-        print(f"流通股本: {stock_data['circulating_shares']}")
-        print(f"总市值: {stock_data['total_market_value']}")
-        print(f"流通市值: {stock_data['circulating_market_value']}")
-        print(f"所属行业: {stock_data['industry']}")
-        print(f"上市日期: {stock_data['listing_date']}")
-        print(f"更新时间: {stock_data['update_time']}")
-    else:
-        print("股票实时数据获取失败")
+    # 2. 再尝试获取ETF数据
+    print("2. 尝试获取ETF数据")
+    etf_data = get_etf_data(product_code, force_update=not use_cache)
+    if etf_data:
+        print(f"成功获取ETF {product_code} 的数据")
+        return ('etf', etf_data)
+    
+    # 3. 最后尝试获取基金数据
+    print("3. 尝试获取基金数据")
+    fund_data = get_fund_data(product_code, force_update=not use_cache)
+    if fund_data:
+        print(f"成功获取基金 {product_code} 的数据")
+        return ('fund', fund_data)
+    
+    print(f"无法获取产品 {product_code} 的数据")
+    return (None, None)
 
 
-def test_get_fund_data():
-    """
-    测试方法：获取基金数据
-    """
-    # 测试基金代码，例如华夏成长混合(000001)
-    test_fund_code = "003376"
-    
-    print(f"正在获取基金 {test_fund_code} 的数据...")
-    print("注意：此操作会获取所有基金数据并存储到数据库，可能需要一些时间...")
-    
-    # 强制获取新数据，绕过缓存机制
-    fund_data = get_fund_data(test_fund_code, force_update=False)
-    
-    if fund_data is not None:
-        print("基金数据获取成功:")
-        print(f"基金代码: {fund_data['fund_code']}")
-        print(f"基金简称: {fund_data['fund_name']}")
-        print(f"单位净值: {fund_data['net_value']}")
-        print(f"累计净值: {fund_data['total_net_value']}")
-        print(f"前交易日-单位净值: {fund_data['prev_net_value']}")
-        print(f"前交易日-累计净值: {fund_data['prev_total_net_value']}")
-        print(f"日增长值: {fund_data['daily_growth_value']}")
-        print(f"日增长率: {fund_data['daily_growth_rate']}%")
-        print(f"申购状态: {fund_data['purchase_status']}")
-        print(f"赎回状态: {fund_data['redemption_status']}")
-        print(f"手续费: {fund_data['fee_rate']}")
-        print(f"更新时间: {fund_data['update_time']}")
-    else:
-        print("基金数据获取失败")
 
-
-if __name__ == "__main__":
-    # 测试股票数据
-    test_get_stock_data()
-    
-    # 测试基金数据
-    # test_get_fund_data()

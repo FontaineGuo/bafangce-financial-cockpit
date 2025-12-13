@@ -38,3 +38,6 @@ dist/
 # 测试覆盖率报告
 .coverage
 htmlcov/
+
+# HTML报表文件
+holdings_report_*.html

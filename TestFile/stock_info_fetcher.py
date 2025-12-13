@@ -12,7 +12,7 @@ def get_stock_info(stock_code: str):
     """
     try:
         # 获取股票基本信息
-        stock_info = ak.stock_bid_ask_em(symbol=stock_code)
+        stock_info = ak.stock_individual_info_em(symbol=stock_code)
         return stock_info
     except Exception as e:
         print(f"获取股票信息时出错: {e}")
@@ -23,7 +23,7 @@ def test_get_stock_info():
     测试方法：获取A股股票信息
     """
     # 测试股票代码，例如平安银行(000001)
-    test_stock_code = "601127"
+    test_stock_code = "515080"
     
     print(f"正在获取股票 {test_stock_code} 的信息...")
     stock_info = get_stock_info(test_stock_code)

@@ -25,7 +25,7 @@ def get_today_fund_nav(fund_code):
         return None
 
 # 示例：获取华夏成长混合(000001)的当日净值
-fund_code = "000001"
+fund_code = "000614"
 result = get_today_fund_nav(fund_code)
 
 if result is not None:

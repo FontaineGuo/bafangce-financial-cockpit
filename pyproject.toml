@@ -8,4 +8,5 @@ dependencies = [
     "akshare>=1.17.91",
     "pandas>=2.2.0",
     "numpy>=1.26.0",
+    "baostock>=0.8.9",
 ]
