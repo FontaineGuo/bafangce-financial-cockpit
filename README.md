@@ -25,7 +25,8 @@ bafangce-financial-cockpit/
 │   ├── data_fetcher.py  # 数据获取模块
 │   ├── holdings_manager.py     # 持仓管理模块
 │   ├── calculator.py    # 计算模块
-│   └── database.py      # 数据库操作
+│   ├── database.py      # 数据库操作
+│   └── asset_allocation.py  # 资产配置监控模块
 ├── ui/
 │   ├── __init__.py
 │   ├── main_window.py   # GUI主界面

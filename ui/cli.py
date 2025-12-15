@@ -8,8 +8,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.holdings_manager import add_holding, get_all_holdings, update_holding, delete_holding
 from core.data_fetcher import get_stock_data, get_fund_data, get_etf_data, fetch_and_store_etf_data, fetch_and_store_fund_data
 from models.holding import Holding
-from core.database import create_tables
+from core.database import create_tables, add_category_column_to_holdings
 from utils import HtmlExporter
+from core.asset_allocation import AssetAllocationMonitor, print_allocation_report
 
 def print_menu():
     """
@@ -23,6 +24,7 @@ def print_menu():
     print("3. 更新持仓")
     print("4. 删除持仓")
     print("5. 强制同步持仓数据")
+    print("6. 查看资产配置报告")
     print("0. 退出")
     print("=" * 50)
 
@@ -208,6 +210,36 @@ def add_holding_cli():
         print("操作已取消!")
         return
     
+    # 获取资产类别
+    print("\n请选择资产类别:")
+    print("1. 中国股票或指数ETF")
+    print("2. 海外股票或指数ETF")
+    print("3. 大宗商品")
+    print("4. 黄金")
+    print("5. 长债")
+    print("6. 短债")
+    print("7. 信用债")
+    print("8. 现金")
+    
+    while True:
+        category_choice = input("请输入类别编号: ").strip()
+        category_map = {
+            "1": "china_stock_etf",
+            "2": "foreign_stock_etf",
+            "3": "commodity",
+            "4": "gold",
+            "5": "long_bond",
+            "6": "short_bond",
+            "7": "credit_bond",
+            "8": "cash"
+        }
+        
+        category = category_map.get(category_choice)
+        if category:
+            break
+        else:
+            print("错误: 无效的类别选择，请重试!")
+    
     # 创建Holding对象
     holding = Holding(
         product_code=product_code,
@@ -215,7 +247,8 @@ def add_holding_cli():
         product_type=product_type,
         quantity=quantity,
         purchase_price=purchase_price,
-        current_price=current_price
+        current_price=current_price,
+        category=category
     )
     
     # 添加持仓
@@ -270,8 +303,8 @@ def update_holding_cli():
         
         # 显示当前持仓列表（简化版）
         print(f"\n{colorize('当前持仓列表:', 'blue')}")
-        print(f"{'ID':^5} {'类型':^6} {'代码':^12} {'名称':^18} {'份额':^12} {'成本价':^12}")
-        print("-" * 80)
+        print(f"{'ID':^5} {'类型':^6} {'代码':^12} {'名称':^18} {'类别':^12} {'份额':^12} {'成本价':^12}")
+        print("-" * 100)
         
         for holding in holdings:
             if holding.product_type == "stock":
@@ -280,15 +313,17 @@ def update_holding_cli():
                 product_type_str = "ETF"
             else:
                 product_type_str = "基金"
+            
             # 安全处理可能为None的字段
             safe_id = holding.id or "null"
             safe_code = holding.product_code or "null"
             safe_name = holding.product_name or "null"
+            safe_category = holding.category or "未分类"
             safe_quantity = holding.quantity if holding.quantity is not None else 0.0
             safe_purchase_price = holding.purchase_price if holding.purchase_price is not None else 0.0
-            print(f"{safe_id:^5} {colorize(product_type_str, 'yellow'):^6} {safe_code:^12} {safe_name:^18} {safe_quantity:^12.2f} {safe_purchase_price:^12.2f}")
+            print(f"{safe_id:^5} {colorize(product_type_str, 'yellow'):^6} {safe_code:^12} {safe_name:^18} {colorize(safe_category, 'green'):^12} {safe_quantity:^12.2f} {safe_purchase_price:^12.2f}")
         
-        print("-" * 80)
+        print("-" * 100)
         
         # 获取要更新的持仓ID
         while True:
@@ -359,6 +394,41 @@ def update_holding_cli():
             except ValueError:
                 print(f"{colorize('错误: 请输入有效的数字！', 'red')}")
         
+        # 更新资产类别
+        current_category = target_holding.category or "未分类"
+        print(f"\n当前资产类别: {current_category}")
+        print("1. 中国股票或指数ETF (china_stock_etf)")
+        print("2. 海外股票或指数ETF (foreign_stock_etf)")
+        print("3. 大宗商品 (commodity)")
+        print("4. 黄金 (gold)")
+        print("5. 长债 (long_bond)")
+        print("6. 短债 (short_bond)")
+        print("7. 信用债 (credit_bond)")
+        print("8. 现金 (cash)")
+        print("9. 保持不变")
+        
+        while True:
+            category_choice = input("请输入新的类别编号: ").strip()
+            category_map = {
+                "1": "china_stock_etf",
+                "2": "foreign_stock_etf",
+                "3": "commodity",
+                "4": "gold",
+                "5": "long_bond",
+                "6": "short_bond",
+                "7": "credit_bond",
+                "8": "cash"
+            }
+            
+            if category_choice == "9":
+                new_category = target_holding.category
+                break
+            elif category_choice in category_map:
+                new_category = category_map[category_choice]
+                break
+            else:
+                print("错误: 无效的类别选择，请重试!")
+        
         # 确认更新
         print(f"\n{colorize('更新确认:', 'blue')}")
         # 安全处理可能为None的字段
@@ -369,12 +439,15 @@ def update_holding_cli():
         safe_purchase_price = target_holding.purchase_price if target_holding.purchase_price is not None else 0.0
         safe_new_quantity = new_quantity if new_quantity is not None else 0.0
         safe_new_purchase_price = new_purchase_price if new_purchase_price is not None else 0.0
+        safe_category = target_holding.category or "未分类"
+        safe_new_category = new_category or "未分类"
         print(f"ID: {safe_id}")
         print(f"类型: {product_type_name}")
         print(f"代码: {safe_code}")
         print(f"名称: {safe_name}")
         print(f"原份额: {safe_quantity} → 新份额: {safe_new_quantity}")
         print(f"原成本价: {safe_purchase_price} → 新成本价: {safe_new_purchase_price}")
+        print(f"原类别: {safe_category} → 新类别: {safe_new_category}")
         
         confirm = input(f"\n{colorize('确认更新此持仓吗？(y/n): ', 'blue')}").strip().lower()
         if confirm != 'y':
@@ -392,6 +465,18 @@ def update_holding_cli():
             current_price=target_holding.current_price
         )
         
+        # 创建更新后的持仓对象
+        updated_holding = Holding(
+            id=target_holding.id,
+            product_code=target_holding.product_code,
+            product_name=target_holding.product_name,
+            product_type=target_holding.product_type,
+            quantity=new_quantity,
+            purchase_price=new_purchase_price,
+            current_price=target_holding.current_price,
+            category=new_category
+        )
+        
         # 更新持仓
         success = update_holding(holding_id, updated_holding)
         
@@ -402,6 +487,44 @@ def update_holding_cli():
             
     except Exception as e:
         print(f"\n{colorize('❌ 更新持仓失败:', 'red')} {e}")
+
+def view_asset_allocation_cli():
+    """查看资产配置报告的命令行界面"""
+    print(f"\n{colorize('=== 资产配置报告 ===', 'blue')}")
+    
+    try:
+        # 获取所有持仓
+        holdings = get_all_holdings()
+        
+        if not holdings:
+            print(f"{colorize('暂无持仓记录，无法生成资产配置报告！', 'yellow')}")
+            return
+        
+        # 创建资产配置监控器
+        monitor = AssetAllocationMonitor()
+        
+        # 生成资产配置报告
+        report = monitor.generate_report(holdings)
+        
+        # 打印报告
+        print_allocation_report(report)
+        
+        # 询问是否导出为HTML文件
+        print(f"\n{colorize('是否将资产配置报告导出为HTML文件？(y/n)', 'blue')}")
+        export_choice = input("请选择: ").strip().lower()
+        
+        if export_choice == 'y':
+            # 创建HTML导出器
+            exporter = HtmlExporter()
+            
+            # 导出资产配置报告
+            output_file = exporter.export_asset_allocation(report)
+            
+            print(f"\n{colorize('✅ 资产配置报告已成功导出为HTML文件：', 'green')}")
+            print(f"文件路径: {output_file}")
+        
+    except Exception as e:
+        print(f"\n{colorize(f'❌ 生成资产配置报告失败: {e}', 'red')}")
 
 def delete_holding_cli():
     """删除持仓的命令行界面"""
@@ -822,6 +945,8 @@ def main():
     """主函数"""
     # 确保数据库表已创建
     create_tables()
+    # 确保holdings表有category字段（用于现有数据库的迁移）
+    add_category_column_to_holdings()
     
     while True:
         print_menu()
@@ -837,6 +962,8 @@ def main():
             delete_holding_cli()
         elif choice == "5":
             force_sync_holdings_cli()
+        elif choice == "6":
+            view_asset_allocation_cli()
         elif choice == "0":
             print("感谢使用持仓管理模块，再见！")
             break

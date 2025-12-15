@@ -271,3 +271,181 @@ class HtmlExporter:
         
         # 导出到文件
         return self.export_to_file(html_content, output_dir, filename)
+    
+    def generate_asset_allocation_html(self, report):
+        """
+        生成资产配置报告的HTML内容
+        
+        Args:
+            report (dict): 资产配置报告数据
+            
+        Returns:
+            str: 完整的资产配置报告HTML内容
+        """
+        # 构建HTML头部
+        html_content = f"""
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资产配置报告</title>
+{self.css_style}
+</head>
+<body>
+    <div class="container">
+        <h1>资产配置报告</h1>
+        
+        <div class="stats">
+            <p>统计信息：</p>
+            <p>总市值: {report['current_allocation']['total_value']:.2f} 元</p>
+            <p>总持仓数量: {report['total_holding_count']}</p>
+            <p>生成时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        </div>
+        
+        <h2>当前资产配置与目标配置对比</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>类别</th>
+                    <th>当前市值</th>
+                    <th>当前占比</th>
+                    <th>持仓数量</th>
+                    <th>目标比例</th>
+                    <th>最大偏离</th>
+                </tr>
+            </thead>
+            <tbody>"""
+        
+        # 获取所有类别
+        categories = report['current_allocation']['categories']
+        strategy = report['strategy']
+        all_categories = sorted(set(categories.keys()).union(set(strategy.keys())))
+        
+        # 添加数据行
+        for category in all_categories:
+            # 获取当前配置数据
+            if category in categories:
+                current_data = categories[category]
+                value = current_data['value']
+                current_ratio = current_data['ratio']
+                count = current_data['holding_count']
+            else:
+                value = 0.0
+                current_ratio = 0.0
+                count = 0
+            
+            # 获取目标配置数据
+            if category in strategy:
+                target_data = strategy[category]
+                target_ratio = target_data['target_ratio']
+                max_deviation = target_data['max_deviation']
+            else:
+                target_ratio = 0.0
+                max_deviation = 0.0
+            
+            html_content += f"""
+                <tr>
+                    <td>{category}</td>
+                    <td>{value:.2f}</td>
+                    <td>{current_ratio:.2%}</td>
+                    <td>{count}</td>
+                    <td>{target_ratio:.2%}</td>
+                    <td>{max_deviation:.2%}</td>
+                </tr>"""
+        
+        html_content += f"""
+            </tbody>
+        </table>"""
+        
+        # 添加偏离预警（如果有的话）
+        warnings = report['warnings']
+        if warnings:
+            html_content += f"""
+        <h2>配置偏离预警</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>类别</th>
+                    <th>当前比例</th>
+                    <th>目标比例</th>
+                    <th>偏离值</th>
+                    <th>状态</th>
+                </tr>
+            </thead>
+            <tbody>"""
+            
+            for warning in warnings:
+                category = warning['category']
+                current_ratio = warning['current_ratio']
+                target_ratio = warning['target_ratio']
+                deviation = warning['deviation']
+                status = '超配' if warning['status'] == 'over' else '低配'
+                
+                # 超配用红色，低配用黄色
+                status_class = 'loss' if warning['status'] == 'over' else 'profit'
+                
+                html_content += f"""
+                <tr>
+                    <td>{category}</td>
+                    <td>{current_ratio:.2%}</td>
+                    <td>{target_ratio:.2%}</td>
+                    <td>{deviation:.2%}</td>
+                    <td class="{status_class}">{status} ⚠</td>
+                </tr>"""
+            
+            html_content += f"""
+            </tbody>
+        </table>"""
+        
+            # 添加调整建议
+            html_content += f"""
+        <h2>调整建议</h2>
+        <ul>"""
+            
+            # 生成调整建议
+            from core.asset_allocation import AssetAllocationMonitor
+            suggestions = AssetAllocationMonitor().get_allocation_suggestions(warnings)
+            for suggestion in suggestions:
+                html_content += f"""
+            <li>{suggestion['suggestion']}</li>"""
+            
+            html_content += f"""
+        </ul>"""
+        else:
+            html_content += f"""
+        <div class="stats">
+            <p>✅ 资产配置符合目标比例，无需调整</p>
+        </div>"""
+        
+        html_content += f"""
+        <div class="footer">
+            <p>资产配置报告 - 自动生成</p>
+        </div>
+    </div>
+</body>
+</html>"""
+        
+        return html_content
+    
+    def export_asset_allocation(self, report, output_dir=None, filename=None):
+        """
+        导出资产配置报告为HTML文件
+        
+        Args:
+            report (dict): 资产配置报告数据
+            output_dir (str, optional): 输出目录
+            filename (str, optional): 文件名
+            
+        Returns:
+            str: 导出的文件路径
+        """
+        # 生成HTML内容
+        html_content = self.generate_asset_allocation_html(report)
+        
+        # 导出到文件
+        if filename is None:
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"asset_allocation_report_{timestamp}.html"
+        
+        return self.export_to_file(html_content, output_dir, filename)

@@ -72,6 +72,7 @@ def create_tables():
             product_code TEXT NOT NULL,
             product_name TEXT NOT NULL,
             product_type TEXT NOT NULL,
+            category TEXT DEFAULT '',
             quantity FLOAT NOT NULL,
             purchase_price FLOAT NOT NULL,
             current_price FLOAT,
@@ -449,9 +450,9 @@ def add_holding_to_db(holding):
     # 使用找到的可用ID插入记录
     query = '''
         INSERT INTO holdings (
-            id, product_code, product_name, product_type, 
+            id, product_code, product_name, product_type, category,
             quantity, purchase_price, current_price
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     '''
     
     params = (
@@ -459,6 +460,7 @@ def add_holding_to_db(holding):
         holding.product_code,
         holding.product_name,
         holding.product_type,
+        holding.category or '',
         holding.quantity,
         holding.purchase_price,
         holding.current_price
@@ -481,7 +483,7 @@ def get_all_holdings_from_db():
     from models.holding import Holding
     
     query = '''
-        SELECT id, product_code, product_name, product_type, 
+        SELECT id, product_code, product_name, product_type, category,
                quantity, purchase_price, current_price 
         FROM holdings
     '''
@@ -495,9 +497,10 @@ def get_all_holdings_from_db():
             product_code=row[1],
             product_name=row[2],
             product_type=row[3],
-            quantity=row[4],
-            purchase_price=row[5],
-            current_price=row[6]
+            category=row[4],
+            quantity=row[5],
+            purchase_price=row[6],
+            current_price=row[7]
         )
         holdings.append(holding)
     
@@ -516,7 +519,7 @@ def update_holding_in_db(holding_id, holding):
     """
     query = '''
         UPDATE holdings 
-        SET product_code = ?, product_name = ?, product_type = ?, 
+        SET product_code = ?, product_name = ?, product_type = ?, category = ?, 
             quantity = ?, purchase_price = ?, current_price = ?, 
             update_time = CURRENT_TIMESTAMP
         WHERE id = ?
@@ -526,6 +529,7 @@ def update_holding_in_db(holding_id, holding):
         holding.product_code,
         holding.product_name,
         holding.product_type,
+        holding.category or '',
         holding.quantity,
         holding.purchase_price,
         holding.current_price,
@@ -567,3 +571,57 @@ def delete_holding_from_db(holding_id):
     conn.close()
     
     return success
+
+def batch_update_holdings(holdings):
+    """
+    批量更新持仓记录
+    
+    Args:
+        holdings (list): 持仓记录列表，每个元素是Holding对象
+    
+    Returns:
+        int: 更新的记录数
+    """
+    if not holdings:
+        return 0
+    
+    query = '''
+        UPDATE holdings SET current_price = ?, update_time = CURRENT_TIMESTAMP WHERE product_code = ?
+    '''
+    
+    conn = connect_db()
+    cursor = conn.cursor()
+    
+    update_count = 0
+    for holding in holdings:
+        if holding.product_code and holding.current_price is not None:
+            cursor.execute(query, (holding.current_price, holding.product_code))
+            update_count += cursor.rowcount
+    
+    conn.commit()
+    conn.close()
+    
+    return update_count
+
+def add_category_column_to_holdings():
+    """
+    为holdings表添加category字段（用于现有数据库的迁移）
+    """
+    conn = connect_db()
+    cursor = conn.cursor()
+    
+    try:
+        # 检查是否已经有category字段
+        cursor.execute("PRAGMA table_info(holdings)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'category' not in columns:
+            cursor.execute("ALTER TABLE holdings ADD COLUMN category TEXT DEFAULT ''")
+            conn.commit()
+            print("成功为holdings表添加category字段")
+        else:
+            print("holdings表已经有category字段")
+    except Exception as e:
+        print(f"添加category字段失败: {e}")
+    finally:
+        conn.close()

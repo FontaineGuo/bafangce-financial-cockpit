@@ -41,3 +41,4 @@ htmlcov/
 
 # HTML报表文件
 holdings_report_*.html
+asset_allocation_report_*.html

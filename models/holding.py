@@ -1,11 +1,12 @@
 # 持仓数据模型
 
 class Holding:
-    def __init__(self, id=None, product_code=None, product_name=None, product_type=None, quantity=None, purchase_price=None, current_price=None):
+    def __init__(self, id=None, product_code=None, product_name=None, product_type=None, category=None, quantity=None, purchase_price=None, current_price=None):
         self.id = id
         self.product_code = product_code  # 代码
         self.product_name = product_name  # 名称
         self.product_type = product_type  # 类型：stock, fund, etc.
+        self.category = category  # 资产类别：equity, bond, commodity, cash, etc.
         self.quantity = quantity  # 持有份额
         self.purchase_price = purchase_price  # 成本单价
         self.current_price = current_price  # 现价单价
@@ -43,6 +44,7 @@ class Holding:
             'product_code': self.product_code,
             'product_name': self.product_name,
             'product_type': self.product_type,
+            'category': self.category,
             'quantity': self.quantity,
             'purchase_price': self.purchase_price,
             'current_price': self.current_price,
@@ -59,6 +61,7 @@ class Holding:
             product_code=data.get('product_code'),
             product_name=data.get('product_name'),
             product_type=data.get('product_type'),
+            category=data.get('category'),
             quantity=data.get('quantity'),
             purchase_price=data.get('purchase_price'),
             current_price=data.get('current_price')
