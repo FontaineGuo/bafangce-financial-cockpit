@@ -888,8 +888,9 @@ def force_sync_holdings_cli():
                             'product_code': product_code,
                             'product_name': product_info.get('stock_name') or holding[2] or holding.product_name,
                             'product_type': product_type,
-                            'quantity': holding[4] if isinstance(holding, tuple) else holding.quantity,
-                            'purchase_price': holding[5] if isinstance(holding, tuple) else holding.purchase_price,
+                            'category': holding[4] if isinstance(holding, tuple) else holding.category,  # 保留原有的category字段
+                            'quantity': holding[5] if isinstance(holding, tuple) else holding.quantity,
+                            'purchase_price': holding[6] if isinstance(holding, tuple) else holding.purchase_price,
                             'current_price': new_price
                         })
                         update_holding(holding_id, updated_holding)
@@ -907,8 +908,9 @@ def force_sync_holdings_cli():
                             'product_code': product_code,
                             'product_name': etf_info.get('etf_name') or holding[2] or holding.product_name,
                             'product_type': product_type,
-                            'quantity': holding[4] if isinstance(holding, tuple) else holding.quantity,
-                            'purchase_price': holding[5] if isinstance(holding, tuple) else holding.purchase_price,
+                            'category': holding[4] if isinstance(holding, tuple) else holding.category,  # 保留原有的category字段
+                            'quantity': holding[5] if isinstance(holding, tuple) else holding.quantity,
+                            'purchase_price': holding[6] if isinstance(holding, tuple) else holding.purchase_price,
                             'current_price': new_price
                         })
                         update_holding(holding_id, updated_holding)
@@ -926,8 +928,9 @@ def force_sync_holdings_cli():
                             'product_code': product_code,
                             'product_name': fund_info.get('fund_name') or holding[2] or holding.product_name,
                             'product_type': product_type,
-                            'quantity': holding[4] if isinstance(holding, tuple) else holding.quantity,
-                            'purchase_price': holding[5] if isinstance(holding, tuple) else holding.purchase_price,
+                            'category': holding[4] if isinstance(holding, tuple) else holding.category,  # 保留原有的category字段
+                            'quantity': holding[5] if isinstance(holding, tuple) else holding.quantity,
+                            'purchase_price': holding[6] if isinstance(holding, tuple) else holding.purchase_price,
                             'current_price': new_price
                         })
                         update_holding(holding_id, updated_holding)
