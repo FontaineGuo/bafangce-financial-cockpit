@@ -1,8 +1,17 @@
 # 数据获取模块
-import akshare as ak
 import sys
 import os
 import datetime
+
+# 导入akshare客户端（隔离外部依赖）
+from core.akshare_client import (
+    fetch_stock_data,
+    fetch_etf_data,
+    fetch_fund_data as ak_fetch_fund_data,
+    fetch_fund_nav,
+    fetch_stock_kline_data,
+    clear_cache
+)
 
 # 将项目根目录添加到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -154,14 +163,11 @@ def fetch_and_store_stock_data(stock_code):
     """
     print(f"开始获取股票 {stock_code} 的数据...")
     try:
-        # 使用AKSHARE获取股票数据
-        print(f"使用AKSHARE获取股票 {stock_code} 数据...")
-        stock_data = ak.stock_individual_info_em(symbol=stock_code)
-        
-        # 如果是DataFrame类型，转换为字典
-        if hasattr(stock_data, 'to_dict'):
-            # 将DataFrame转换为以'item'为键，'value'为值的字典
-            stock_data = dict(zip(stock_data['item'], stock_data['value']))
+        # 使用akshare客户端获取股票数据
+        stock_data = fetch_stock_data(stock_code)
+        if not stock_data:
+            print(f"无法获取股票 {stock_code} 数据")
+            return None
         
         # 转换数据格式以适应数据库存储
         db_stock_data = {
@@ -469,10 +475,10 @@ def fetch_and_store_fund_data(fund_code):
     """
     print(f"开始获取基金 {fund_code} 的数据...")
     try:
-        # 使用AKSHARE获取基金数据
-        print("使用AKSHARE获取基金数据...")
+        # 使用akshare客户端获取基金数据
+        print("使用akshare客户端获取基金数据...")
         import pandas as pd
-        df = ak.fund_open_fund_daily_em()
+        df = ak_fetch_fund_data()
         print(f"成功获取 {len(df)} 条基金数据")
         print(f"DataFrame列名: {list(df.columns)}")
         
@@ -630,9 +636,9 @@ def fetch_and_store_etf_data(etf_code):
     """
     print(f"开始获取ETF {etf_code} 的数据...")
     try:
-        # 使用AKSHARE获取ETF数据
-        print("使用AKSHARE获取ETF数据...")
-        df = ak.fund_etf_fund_daily_em()
+        # 使用akshare客户端获取ETF数据
+        print("使用akshare客户端获取ETF数据...")
+        df = fetch_etf_data()
         print(f"成功获取 {len(df)} 条ETF数据")
         print(f"DataFrame列名: {list(df.columns)}")
         

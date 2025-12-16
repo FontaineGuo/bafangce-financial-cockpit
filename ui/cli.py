@@ -5,11 +5,11 @@ import os
 # 将项目根目录添加到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.holdings_manager import add_holding, get_all_holdings, update_holding, delete_holding
-from core.data_fetcher import get_stock_data, get_fund_data, get_etf_data, fetch_and_store_etf_data, fetch_and_store_fund_data
+# 导入投资组合管理器
+from core.portfolio import portfolio_manager
 from models.holding import Holding
 from core.database import create_tables, add_category_column_to_holdings
-from utils import HtmlExporter
+from utils.html_exporter import HtmlExporter
 from core.asset_allocation import AssetAllocationMonitor, print_allocation_report
 
 def print_menu():
@@ -240,21 +240,24 @@ def add_holding_cli():
         else:
             print("错误: 无效的类别选择，请重试!")
     
-    # 创建Holding对象
-    holding = Holding(
-        product_code=product_code,
-        product_name=product_name,
-        product_type=product_type,
-        quantity=quantity,
-        purchase_price=purchase_price,
-        current_price=current_price,
-        category=category
-    )
+    # 准备持仓数据
+    holding_data = {
+        'product_code': product_code,
+        'product_name': product_name,
+        'product_type': product_type,
+        'quantity': quantity,
+        'purchase_price': purchase_price,
+        'current_price': current_price,
+        'category': category
+    }
     
     # 添加持仓
     try:
-        holding_id = add_holding(holding)
-        print(f"\n✅ 持仓添加成功！持仓ID: {holding_id}")
+        success, result = portfolio_manager.add_holding(holding_data)
+        if success:
+            print(f"\n✅ 持仓添加成功！持仓ID: {result['holding_id']}")
+        else:
+            print(f"\n❌ 持仓添加失败: {result['message']}")
     except Exception as e:
         print(f"\n❌ 持仓添加失败: {e}")
 
@@ -295,7 +298,7 @@ def update_holding_cli():
     
     try:
         # 获取所有持仓
-        holdings = get_all_holdings()
+        holdings = portfolio_manager.get_all_holdings()
         
         if not holdings:
             print(f"{colorize('暂无持仓记录！', 'yellow')}")
@@ -454,31 +457,15 @@ def update_holding_cli():
             print(f"{colorize('操作已取消！', 'yellow')}")
             return
         
-        # 创建更新后的持仓对象
-        updated_holding = Holding(
-            id=target_holding.id,
-            product_code=target_holding.product_code,
-            product_name=target_holding.product_name,
-            product_type=target_holding.product_type,
-            quantity=new_quantity,
-            purchase_price=new_purchase_price,
-            current_price=target_holding.current_price
-        )
-        
-        # 创建更新后的持仓对象
-        updated_holding = Holding(
-            id=target_holding.id,
-            product_code=target_holding.product_code,
-            product_name=target_holding.product_name,
-            product_type=target_holding.product_type,
-            quantity=new_quantity,
-            purchase_price=new_purchase_price,
-            current_price=target_holding.current_price,
-            category=new_category
-        )
+        # 准备更新数据
+        updated_data = {
+            'quantity': new_quantity,
+            'purchase_price': new_purchase_price,
+            'category': new_category
+        }
         
         # 更新持仓
-        success = update_holding(holding_id, updated_holding)
+        success = portfolio_manager.update_holding(holding_id, updated_data)
         
         if success:
             print(f"\n{colorize('✅ 持仓更新成功！', 'green')}")
@@ -494,7 +481,7 @@ def view_asset_allocation_cli():
     
     try:
         # 获取所有持仓
-        holdings = get_all_holdings()
+        holdings = portfolio_manager.get_all_holdings()
         
         if not holdings:
             print(f"{colorize('暂无持仓记录，无法生成资产配置报告！', 'yellow')}")
@@ -532,7 +519,7 @@ def delete_holding_cli():
     
     try:
         # 获取所有持仓
-        holdings = get_all_holdings()
+        holdings = portfolio_manager.get_all_holdings()
         
         if not holdings:
             print(f"{colorize('暂无持仓记录！', 'yellow')}")
@@ -596,7 +583,7 @@ def delete_holding_cli():
             return
         
         # 删除持仓
-        success = delete_holding(holding_id)
+        success = portfolio_manager.delete_holding(holding_id)
         
         if success:
             print(f"\n{colorize('✅ 持仓删除成功！', 'green')}")
@@ -611,44 +598,19 @@ def view_holdings_cli():
     print(f"\n{colorize('=== 查看所有持仓 ===', 'blue')}")
     
     try:
-        # 获取所有持仓
-        holdings = get_all_holdings()
+        # 获取所有持仓（已经是Holding对象列表）
+        holding_objects = portfolio_manager.get_all_holdings()
         
-        if not holdings:
+        if not holding_objects:
             print(f"{colorize('暂无持仓记录！', 'yellow')}")
             return
         
-        # 计算总计数据
-        total_cost = 0
-        total_current = 0
-        total_profit = 0
-        
-        # 转换所有持仓为Holding对象并计算总计
-        holding_objects = []
-        for holding in holdings:
-            if isinstance(holding, tuple):
-                # 安全处理数据库返回的元组，确保没有None值
-                holding = Holding.from_dict({
-                    'id': holding[0] or 0,
-                    'product_code': holding[1] or "null",
-                    'product_name': holding[2] or "null",
-                    'product_type': holding[3] or "null",
-                    'quantity': holding[4] or 0.0,
-                    'purchase_price': holding[5] or 0.0,
-                    'current_price': holding[6] or 0.0,
-                    'update_time': holding[7]
-                })
-            holding_objects.append(holding)
-            # 确保计算时使用安全值
-            safe_cost_total = holding.cost_total if holding.cost_total is not None else 0.0
-            safe_current_total = holding.current_total if holding.current_total is not None else 0.0
-            safe_profit_total = holding.profit_total if holding.profit_total is not None else 0.0
-            total_cost += safe_cost_total
-            total_current += safe_current_total
-            total_profit += safe_profit_total
-        
-        # 计算总盈利率
-        total_profit_rate = (total_profit / total_cost * 100) if total_cost > 0 else 0
+        # 使用portfolio_manager计算总计数据
+        stats = portfolio_manager.calculate_portfolio_stats()
+        total_cost = stats['total_cost']
+        total_current = stats['total_current']
+        total_profit = stats['total_profit']
+        total_profit_rate = stats['total_profit_rate']
         
         # 打印持仓列表
         # 定义表格宽度
@@ -755,13 +717,11 @@ def view_holdings_cli():
         # 打印底部边框
         print(border_line)
         
-        # 统计信息
-        stock_count = sum(1 for h in holding_objects if h.product_type == 'stock')
-        etf_count = sum(1 for h in holding_objects if h.product_type == 'etf')
-        fund_count = sum(1 for h in holding_objects if h.product_type == 'fund')
+        # 统计信息（使用portfolio_manager的统计数据）
+        stats = portfolio_manager.calculate_portfolio_stats()
         print(f"\n{colorize('统计信息:', 'blue')}")
-        print(f"  总持仓数量: {len(holding_objects)}  股票: {stock_count}  ETF: {etf_count}  基金: {fund_count}")
-        print(f"  总成本: {total_cost:.2f}  总市值: {total_current:.2f}  总盈亏: {total_profit:.2f}  总盈利率: {total_profit_rate:.2f}%")
+        print(f"  总持仓数量: {stats['total_holdings']}  股票: {stats['stock_count']}  ETF: {stats['etf_count']}  基金: {stats['fund_count']}")
+        print(f"  总成本: {stats['total_cost']:.2f}  总市值: {stats['total_current']:.2f}  总盈亏: {stats['total_profit']:.2f}  总盈利率: {stats['total_profit_rate']:.2f}%")
         
         # 询问是否导出为HTML文件
         export_choice = input(f"\n{colorize('是否将持仓数据导出为HTML表格文件？(y/n): ', 'blue')}").strip().lower()
@@ -771,7 +731,7 @@ def view_holdings_cli():
                 # 导出到当前目录
                 html_file = exporter.export_holdings(
                     holding_objects, total_cost, total_current, total_profit, total_profit_rate,
-                    stock_count, etf_count, fund_count
+                    stats['stock_count'], stats['etf_count'], stats['fund_count']
                 )
                 print(f"\n{colorize('✅ HTML表格已成功导出！', 'green')}")
                 print(f"   文件路径: {html_file}")
@@ -790,8 +750,8 @@ def force_sync_holdings_cli():
     print(f"\n{colorize('=== 强制同步持仓数据 ===', 'blue')}")
     
     try:
-        # 获取所有持仓
-        holdings = get_all_holdings()
+        # 使用portfolio_manager获取所有持仓
+        holdings = portfolio_manager.get_all_holdings()
         
         if not holdings:
             print(f"{colorize('暂无持仓记录！', 'yellow')}")
@@ -803,14 +763,8 @@ def force_sync_holdings_cli():
         fund_codes = set()
         
         for holding in holdings:
-            if isinstance(holding, tuple):
-                # 数据库返回的元组格式
-                product_type = holding[3] or ""
-                product_code = holding[1] or ""
-            else:
-                # Holding对象格式
-                product_type = holding.product_type or ""
-                product_code = holding.product_code or ""
+            product_type = holding.product_type or ""
+            product_code = holding.product_code or ""
             
             if product_type == "stock":
                 stock_codes.append(product_code)
@@ -833,108 +787,8 @@ def force_sync_holdings_cli():
         
         print(f"\n{colorize('开始同步数据...', 'green')}")
         
-        # 同步ETF数据（一次获取所有）
-        if etf_codes:
-            print(f"\n{colorize('1. 同步ETF数据:', 'blue')}")
-            # 随便选一个ETF代码触发获取所有ETF数据
-            sample_etf = next(iter(etf_codes))
-            print(f"   获取所有ETF数据...")
-            fetch_and_store_etf_data(sample_etf)
-            print(f"   ETF数据同步完成！")
-        
-        # 同步基金数据（一次获取所有）
-        if fund_codes:
-            print(f"\n{colorize('2. 同步基金数据:', 'blue')}")
-            # 随便选一个基金代码触发获取所有基金数据
-            sample_fund = next(iter(fund_codes))
-            print(f"   获取所有基金数据...")
-            fetch_and_store_fund_data(sample_fund)
-            print(f"   基金数据同步完成！")
-        
-        # 同步股票数据（逐个获取）
-        if stock_codes:
-            print(f"\n{colorize('3. 同步股票数据:', 'blue')}")
-            for i, stock_code in enumerate(stock_codes, 1):
-                print(f"   {i}/{len(stock_codes)}: 同步股票 {stock_code}...")
-                get_stock_data(stock_code, force_update=True)
-            print(f"   股票数据同步完成！")
-        
-        # 更新持仓的当前价格
-        print(f"\n{colorize('4. 更新持仓数据:', 'blue')}")
-        updated_count = 0
-        
-        for holding in holdings:
-            if isinstance(holding, tuple):
-                # 转换为Holding对象
-                holding_id = holding[0]
-                product_code = holding[1]
-                product_type = holding[3]
-            else:
-                holding_id = holding.id
-                product_code = holding.product_code
-                product_type = holding.product_type
-            
-            print(f"   更新持仓ID {holding_id} ({product_code})...")
-            
-            # 获取最新的产品数据
-            if product_type == "stock":
-                product_info = get_stock_data(product_code)
-                if product_info:
-                    new_price = product_info.get('current_price')
-                    if new_price is not None:
-                        # 更新持仓的当前价格
-                        updated_holding = Holding.from_dict({
-                            'id': holding_id,
-                            'product_code': product_code,
-                            'product_name': product_info.get('stock_name') or holding[2] or holding.product_name,
-                            'product_type': product_type,
-                            'category': holding[4] if isinstance(holding, tuple) else holding.category,  # 保留原有的category字段
-                            'quantity': holding[5] if isinstance(holding, tuple) else holding.quantity,
-                            'purchase_price': holding[6] if isinstance(holding, tuple) else holding.purchase_price,
-                            'current_price': new_price
-                        })
-                        update_holding(holding_id, updated_holding)
-                        updated_count += 1
-            
-            elif product_type == "etf":
-                from core.database import get_etf_by_code
-                etf_info = get_etf_by_code(product_code)
-                if etf_info:
-                    new_price = etf_info.get('net_value')
-                    if new_price is not None:
-                        # 更新持仓的当前价格
-                        updated_holding = Holding.from_dict({
-                            'id': holding_id,
-                            'product_code': product_code,
-                            'product_name': etf_info.get('etf_name') or holding[2] or holding.product_name,
-                            'product_type': product_type,
-                            'category': holding[4] if isinstance(holding, tuple) else holding.category,  # 保留原有的category字段
-                            'quantity': holding[5] if isinstance(holding, tuple) else holding.quantity,
-                            'purchase_price': holding[6] if isinstance(holding, tuple) else holding.purchase_price,
-                            'current_price': new_price
-                        })
-                        update_holding(holding_id, updated_holding)
-                        updated_count += 1
-            
-            elif product_type == "fund":
-                from core.database import get_fund_by_code
-                fund_info = get_fund_by_code(product_code)
-                if fund_info:
-                    new_price = fund_info.get('net_value')
-                    if new_price is not None:
-                        # 更新持仓的当前价格
-                        updated_holding = Holding.from_dict({
-                            'id': holding_id,
-                            'product_code': product_code,
-                            'product_name': fund_info.get('fund_name') or holding[2] or holding.product_name,
-                            'product_type': product_type,
-                            'category': holding[4] if isinstance(holding, tuple) else holding.category,  # 保留原有的category字段
-                            'quantity': holding[5] if isinstance(holding, tuple) else holding.quantity,
-                            'purchase_price': holding[6] if isinstance(holding, tuple) else holding.purchase_price,
-                            'current_price': new_price
-                        })
-                        update_holding(holding_id, updated_holding)
-                        updated_count += 1
+        # 使用portfolio_manager更新所有持仓价格
+        updated_count = portfolio_manager.update_holding_prices()
         
         print(f"\n{colorize('数据同步完成！', 'green')}")
         print(f"   成功更新 {updated_count}/{len(holdings)} 个持仓")
