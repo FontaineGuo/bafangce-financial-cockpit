@@ -9,4 +9,6 @@ dependencies = [
     "pandas>=2.2.0",
     "numpy>=1.26.0",
     "baostock>=0.8.9",
+    "fastapi>=0.124.4",
+    "uvicorn>=0.38.0",
 ]

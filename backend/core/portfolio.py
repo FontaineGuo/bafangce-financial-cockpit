@@ -4,21 +4,21 @@ import os
 import datetime
 
 # 将项目根目录添加到Python路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from core.holdings_manager import (
+from backend.core.holdings_manager import (
     get_all_holdings as db_get_all_holdings,
     add_holding as db_add_holding,
     update_holding as db_update_holding,
     delete_holding as db_delete_holding
 )
-from core.data_fetcher import (
+from backend.core.data_fetcher import (
     get_stock_data,
     get_etf_data,
     get_fund_data,
     get_realtime_data
 )
-from models.holding import Holding
+from backend.models.holding import Holding
 from utils.helpers import normalize_number
 
 class PortfolioManager:
@@ -43,7 +43,7 @@ class PortfolioManager:
             list: Holding对象列表
         """
         try:
-            holdings = db_get_all_holdings()
+            holdings = db_get_all_holdings(self.user_id)
             # 转换为Holding对象（如果是元组格式）
             holding_objects = []
             for holding in holdings:
@@ -104,7 +104,7 @@ class PortfolioManager:
             holding = Holding.from_dict(holding_data)
             
             # 添加到数据库
-            holding_id = db_add_holding(holding)
+            holding_id = db_add_holding(holding, self.user_id)
             
             return True, {
                 'message': '持仓添加成功',

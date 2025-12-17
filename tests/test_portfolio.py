@@ -12,8 +12,8 @@ from unittest.mock import patch, MagicMock
 # 将项目根目录添加到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.portfolio import PortfolioManager
-from models.holding import Holding
+from backend.core.portfolio import PortfolioManager
+from backend.models.holding import Holding
 
 class TestPortfolioManager(unittest.TestCase):
     """PortfolioManager类的单元测试"""
@@ -26,7 +26,7 @@ class TestPortfolioManager(unittest.TestCase):
         """测试后置清理"""
         pass
     
-    @patch('core.portfolio.db_get_all_holdings')
+    @patch('backend.core.portfolio.db_get_all_holdings')
     def test_get_all_holdings(self, mock_db_get_all):
         """测试获取所有持仓"""
         # 模拟数据库返回
@@ -43,8 +43,8 @@ class TestPortfolioManager(unittest.TestCase):
         self.assertEqual(holdings[0].product_code, '000001')
         self.assertEqual(holdings[1].product_code, '000002')
     
-    @patch('core.portfolio.get_realtime_data')
-    @patch('core.portfolio.db_add_holding')
+    @patch('backend.core.portfolio.get_realtime_data')
+    @patch('backend.core.portfolio.db_add_holding')
     def test_add_holding(self, mock_db_add, mock_get_realtime):
         """测试添加持仓"""
         # 模拟实时数据返回
@@ -70,8 +70,8 @@ class TestPortfolioManager(unittest.TestCase):
         self.assertEqual(result['holding_id'], 1)
         self.assertEqual(result['category'], '其他')
     
-    @patch('core.portfolio.db_update_holding')
-    @patch('core.portfolio.db_get_all_holdings')
+    @patch('backend.core.portfolio.db_update_holding')
+    @patch('backend.core.portfolio.db_get_all_holdings')
     def test_update_holding(self, mock_db_get_all, mock_db_update):
         """测试更新持仓"""
         # 模拟数据库返回
@@ -94,7 +94,7 @@ class TestPortfolioManager(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(result['message'], '持仓更新成功')
     
-    @patch('core.portfolio.db_delete_holding')
+    @patch('backend.core.portfolio.db_delete_holding')
     def test_delete_holding(self, mock_db_delete):
         """测试删除持仓"""
         # 模拟数据库删除返回
@@ -106,7 +106,7 @@ class TestPortfolioManager(unittest.TestCase):
         self.assertTrue(success)
         self.assertEqual(message, '持仓删除成功')
     
-    @patch('core.portfolio.db_get_all_holdings')
+    @patch('backend.core.portfolio.db_get_all_holdings')
     def test_calculate_asset_allocation(self, mock_db_get_all):
         """测试计算资产配置"""
         # 模拟数据库返回
@@ -122,7 +122,7 @@ class TestPortfolioManager(unittest.TestCase):
         self.assertIn('china_stock_etf', allocation['categories'])
         self.assertEqual(allocation['categories']['china_stock_etf']['market_value'], 2200.0)
     
-    @patch('core.portfolio.db_get_all_holdings')
+    @patch('backend.core.portfolio.db_get_all_holdings')
     def test_search_holdings(self, mock_db_get_all):
         """测试搜索持仓"""
         # 模拟数据库返回

@@ -1,7 +1,7 @@
 # 主界面
 import tkinter as tk
 from tkinter import ttk
-from config.constants import WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT
+from backend.config.constants import WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT
 
 class MainWindow:
     def __init__(self, root):

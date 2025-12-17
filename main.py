@@ -1,7 +1,7 @@
 # 主程序入口
 import tkinter as tk
 from ui.main_window import MainWindow
-from core.database import create_tables, add_category_column_to_holdings
+from backend.core.database import create_tables, add_category_column_to_holdings
 
 
 def main():

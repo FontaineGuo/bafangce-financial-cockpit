@@ -6,11 +6,11 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入投资组合管理器
-from core.portfolio import portfolio_manager
-from models.holding import Holding
-from core.database import create_tables, add_category_column_to_holdings
+from backend.core.portfolio import portfolio_manager
+from backend.models.holding import Holding
+from backend.core.database import create_tables, add_category_column_to_holdings
 from utils.html_exporter import HtmlExporter
-from core.asset_allocation import AssetAllocationMonitor, print_allocation_report
+from backend.core.asset_allocation import AssetAllocationMonitor, print_allocation_report
 
 def print_menu():
     """
