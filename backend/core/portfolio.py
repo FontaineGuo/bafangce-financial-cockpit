@@ -19,7 +19,7 @@ from backend.core.data_fetcher import (
     get_realtime_data
 )
 from backend.models.holding import Holding
-from utils.helpers import normalize_number
+from backend.utils.helpers import normalize_number
 
 class PortfolioManager:
     """
@@ -491,3 +491,4 @@ def calculate_portfolio_stats():
 def calculate_asset_allocation():
     """计算资产配置（向后兼容）"""
     return portfolio_manager.calculate_asset_allocation()
+
