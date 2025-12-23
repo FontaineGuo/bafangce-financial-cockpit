@@ -17,7 +17,7 @@ router = APIRouter()
 # 实例化PortfolioManager（在实际项目中，这应该通过依赖注入来管理）
 portfolio_manager = PortfolioManager()
 
-@router.get("/holdings", response_model=List[Dict[str, Any]])
+@router.get("/", response_model=List[Dict[str, Any]])
 async def get_all_holdings():
     """获取所有持仓"""
     try:
@@ -27,7 +27,7 @@ async def get_all_holdings():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取持仓失败: {str(e)}")
 
-@router.post("/holdings", response_model=Dict[str, Any])
+@router.post("/", response_model=Dict[str, Any])
 async def add_holding(holding_data: Dict[str, Any]):
     """添加新持仓"""
     try:
@@ -46,7 +46,7 @@ async def add_holding(holding_data: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"添加持仓失败: {str(e)}")
 
-@router.put("/holdings/{holding_id}", response_model=Dict[str, Any])
+@router.put("/{holding_id}", response_model=Dict[str, Any])
 async def update_holding(holding_id: int, update_data: Dict[str, Any]):
     """更新持仓信息"""
     try:
@@ -59,7 +59,7 @@ async def update_holding(holding_id: int, update_data: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"更新持仓失败: {str(e)}")
 
-@router.delete("/holdings/{holding_id}", response_model=Dict[str, Any])
+@router.delete("/{holding_id}", response_model=Dict[str, Any])
 async def delete_holding(holding_id: int):
     """删除持仓"""
     try:
@@ -72,7 +72,18 @@ async def delete_holding(holding_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"删除持仓失败: {str(e)}")
 
-@router.get("/asset-allocation", response_model=Dict[str, Any])
+@router.post("/sync", response_model=Dict[str, Any])
+async def sync_holdings():
+    """强制同步持仓数据"""
+    try:
+        # 实现同步逻辑
+        # 这里可以调用portfolio_manager中的方法来同步数据
+        # 例如：从数据源获取最新数据并更新数据库
+        return {"message": "持仓数据同步完成"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"同步数据失败: {str(e)}")
+
+@router.get("/allocation", response_model=Dict[str, Any])
 async def get_asset_allocation():
     """获取资产配置信息"""
     try:

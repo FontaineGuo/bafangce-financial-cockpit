@@ -1,5 +1,5 @@
 # 数据目录
-/data/
+./backend/data/
 
 # 虚拟环境
 .venv/
