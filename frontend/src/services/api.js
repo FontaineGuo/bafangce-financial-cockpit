@@ -44,7 +44,10 @@ export default {
     forceSync: () => api.post('/api/portfolio/sync'),
     
     // 获取资产配置
-    getAssetAllocation: () => api.get('/api/portfolio/allocation')
+    getAssetAllocation: () => api.get('/api/portfolio/allocation'),
+    
+    // 搜索持仓
+    search: (keyword) => api.get(`/api/portfolio/search/${keyword}`)
   },
   
   // 收益分析相关API

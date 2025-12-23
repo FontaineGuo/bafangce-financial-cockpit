@@ -48,43 +48,9 @@
       <div v-if="activeTab === 'strategy'" class="settings-section">
         <h2>策略参数</h2>
         <div class="settings-grid">
+          <!-- 策略参数部分暂时为空 -->
           <div class="setting-item">
-            <label for="riskLevel">风险等级</label>
-            <select id="riskLevel" v-model="settings.riskLevel">
-              <option value="low">低风险</option>
-              <option value="medium">中风险</option>
-              <option value="high">高风险</option>
-            </select>
-          </div>
-          <div class="setting-item">
-            <label for="maxStocks">最大股票数量</label>
-            <input 
-              type="number" 
-              id="maxStocks" 
-              v-model.number="settings.maxStocks" 
-              min="5" 
-              max="30"
-            >
-          </div>
-          <div class="setting-item">
-            <label for="minDiversification">最小行业分散度</label>
-            <input 
-              type="number" 
-              id="minDiversification" 
-              v-model.number="settings.minDiversification" 
-              min="2" 
-              max="10"
-            >
-          </div>
-          <div class="setting-item">
-            <label for="maxAllocation">单只股票最大配置比例（%）</label>
-            <input 
-              type="number" 
-              id="maxAllocation" 
-              v-model.number="settings.maxAllocation" 
-              min="5" 
-              max="50"
-            >
+            <p>该功能正在开发中...</p>
           </div>
         </div>
       </div>
@@ -140,6 +106,73 @@
           </div>
         </div>
       </div>
+      <!-- 资产配置 -->
+      <div v-if="activeTab === 'allocation'" class="settings-section">
+        <h2>资产配置策略</h2>
+        <p class="section-description">配置各类资产的目标比例和允许的最大偏离度</p>
+        <div class="allocation-table">
+          <table>
+            <thead>
+              <tr>
+                <th>资产类别</th>
+                <th>目标比例 (%)</th>
+                <th>最大偏离 (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>中国股票或指数ETF</td>
+                <td><input type="number" v-model.number="settings.assetAllocation.china_stock_etf.target_ratio" step="0.001" min="0" max="1" @input="formatAllocationInput('china_stock_etf', 'target_ratio')"></td>
+                <td><input type="number" v-model.number="settings.assetAllocation.china_stock_etf.max_deviation" step="0.001" min="0" max="0.2" @input="formatAllocationInput('china_stock_etf', 'max_deviation')"></td>
+              </tr>
+              <tr>
+                <td>海外股票或指数ETF</td>
+                <td><input type="number" v-model.number="settings.assetAllocation.foreign_stock_etf.target_ratio" step="0.001" min="0" max="1" @input="formatAllocationInput('foreign_stock_etf', 'target_ratio')"></td>
+                <td><input type="number" v-model.number="settings.assetAllocation.foreign_stock_etf.max_deviation" step="0.001" min="0" max="0.2" @input="formatAllocationInput('foreign_stock_etf', 'max_deviation')"></td>
+              </tr>
+              <tr>
+                <td>大宗商品</td>
+                <td><input type="number" v-model.number="settings.assetAllocation.commodity.target_ratio" step="0.001" min="0" max="1" @input="formatAllocationInput('commodity', 'target_ratio')"></td>
+                <td><input type="number" v-model.number="settings.assetAllocation.commodity.max_deviation" step="0.001" min="0" max="0.2" @input="formatAllocationInput('commodity', 'max_deviation')"></td>
+              </tr>
+              <tr>
+                <td>黄金</td>
+                <td><input type="number" v-model.number="settings.assetAllocation.gold.target_ratio" step="0.001" min="0" max="1" @input="formatAllocationInput('gold', 'target_ratio')"></td>
+                <td><input type="number" v-model.number="settings.assetAllocation.gold.max_deviation" step="0.001" min="0" max="0.2" @input="formatAllocationInput('gold', 'max_deviation')"></td>
+              </tr>
+              <tr>
+                <td>长债</td>
+                <td><input type="number" v-model.number="settings.assetAllocation.long_bond.target_ratio" step="0.001" min="0" max="1" @input="formatAllocationInput('long_bond', 'target_ratio')"></td>
+                <td><input type="number" v-model.number="settings.assetAllocation.long_bond.max_deviation" step="0.001" min="0" max="0.2" @input="formatAllocationInput('long_bond', 'max_deviation')"></td>
+              </tr>
+              <tr>
+                <td>短债</td>
+                <td><input type="number" v-model.number="settings.assetAllocation.short_bond.target_ratio" step="0.001" min="0" max="1" @input="formatAllocationInput('short_bond', 'target_ratio')"></td>
+                <td><input type="number" v-model.number="settings.assetAllocation.short_bond.max_deviation" step="0.001" min="0" max="0.2" @input="formatAllocationInput('short_bond', 'max_deviation')"></td>
+              </tr>
+              <tr>
+                <td>信用债</td>
+                <td><input type="number" v-model.number="settings.assetAllocation.credit_bond.target_ratio" step="0.001" min="0" max="1" @input="formatAllocationInput('credit_bond', 'target_ratio')"></td>
+                <td><input type="number" v-model.number="settings.assetAllocation.credit_bond.max_deviation" step="0.001" min="0" max="0.2" @input="formatAllocationInput('credit_bond', 'max_deviation')"></td>
+              </tr>
+              <tr>
+                <td>现金</td>
+                <td><input type="number" v-model.number="settings.assetAllocation.cash.target_ratio" step="0.001" min="0" max="1" @input="formatAllocationInput('cash', 'target_ratio')"></td>
+                <td><input type="number" v-model.number="settings.assetAllocation.cash.max_deviation" step="0.001" min="0" max="0.2" @input="formatAllocationInput('cash', 'max_deviation')"></td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>总计</td>
+                <td colspan="2">{{ calculateTotalAllocation() }}%</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="allocation-note">
+          <p><strong>注意：</strong>所有资产类别的目标比例之和应等于100%</p>
+        </div>
+      </div>
     </div>
     
     <div class="settings-actions">
@@ -159,6 +192,7 @@ export default {
       tabs: [
         { id: 'basic', name: '基础配置' },
         { id: 'strategy', name: '策略参数' },
+        { id: 'allocation', name: '资产配置' },
         { id: 'ai', name: 'AI配置' },
         { id: 'notifications', name: '通知设置' }
       ],
@@ -167,16 +201,22 @@ export default {
       settings: {
         refreshInterval: 30,
         defaultPortfolio: '',
-        riskLevel: 'medium',
-        maxStocks: 15,
-        minDiversification: 5,
-        maxAllocation: 20,
         aiEnabled: true,
         aiModel: 'gpt-3.5-turbo',
         aiFrequency: 'weekly',
         priceAlerts: true,
         priceThreshold: 5,
-        newsAlerts: false
+        newsAlerts: false,
+        assetAllocation: {
+          china_stock_etf: { target_ratio: 0.10, max_deviation: 0.03 },
+          foreign_stock_etf: { target_ratio: 0.10, max_deviation: 0.03 },
+          commodity: { target_ratio: 0.10, max_deviation: 0.03 },
+          gold: { target_ratio: 0.10, max_deviation: 0.03 },
+          long_bond: { target_ratio: 0.30, max_deviation: 0.03 },
+          short_bond: { target_ratio: 0.198, max_deviation: 0.03 },
+          credit_bond: { target_ratio: 0.102, max_deviation: 0.03 },
+          cash: { target_ratio: 0.00, max_deviation: 0.00 }
+        }
       },
       originalSettings: {}
     };
@@ -201,8 +241,8 @@ export default {
     },
     async loadPortfolios() {
       try {
-        const response = await api.portfolio.getList();
-        this.portfolios = response.data;
+        const response = await api.holdings.getAll();
+        this.portfolios = response;
       } catch (error) {
         console.error('加载持仓列表失败:', error);
       }
@@ -222,7 +262,26 @@ export default {
     resetSettings() {
       this.settings = { ...this.originalSettings };
       alert('配置已重置');
-    }
+    },
+    
+    // 格式化资产配置输入值
+    formatAllocationInput(category, field) {
+      const value = this.settings.assetAllocation[category][field];
+      if (value < 0) {
+        this.settings.assetAllocation[category][field] = 0;
+      } else if (field === 'target_ratio' && value > 1) {
+        this.settings.assetAllocation[category][field] = 1;
+      } else if (field === 'max_deviation' && value > 0.2) {
+        this.settings.assetAllocation[category][field] = 0.2;
+      }
+    },
+    
+    // 计算总配置比例
+    calculateTotalAllocation() {
+      const total = Object.values(this.settings.assetAllocation)
+        .reduce((sum, asset) => sum + asset.target_ratio, 0);
+      return (total * 100).toFixed(2);
+    },
   }
 };
 </script>
@@ -334,4 +393,56 @@ export default {
   background-color: #2196F3;
   color: white;
 }
+.allocation-table {
+  margin: 20px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.allocation-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.allocation-table th, .allocation-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.allocation-table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.allocation-table input {
+  width: 80px;
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.allocation-note {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  color: #856404;
+}
+
+.allocation-note strong {
+  color: #721c24;
+}
 </style>
+
+
+
+
+
+
+
+
+

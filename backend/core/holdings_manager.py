@@ -57,8 +57,17 @@ def add_holding(holding, user_id=None):
         int: 新增持仓的ID
     """
     try:
-        # 转换为字典格式
-        holding_data = holding.to_dict()
+        # 只提取数据库表中实际存在的字段
+        holding_data = {
+            'product_code': holding.product_code,
+            'product_name': holding.product_name,
+            'product_type': holding.product_type,
+            'category': holding.category,
+            'quantity': holding.quantity,
+            'purchase_price': holding.purchase_price,
+            'current_price': holding.current_price,
+            'purchase_date': getattr(holding, 'purchase_date', None)  # 可选字段
+        }
         
         # 添加用户ID（如果提供）
         if user_id is not None:

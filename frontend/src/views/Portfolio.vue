@@ -6,6 +6,11 @@
       <button @click="forceSyncData" class="sync-btn">强制同步数据</button>
       <button @click="showAddModal = true" class="create-btn">添加持仓</button>
       <button @click="viewAssetAllocation" class="allocation-btn">资产配置</button>
+      <div class="search-container">
+        <input type="text" v-model="searchKeyword" placeholder="搜索持仓..." class="search-input">
+        <button @click="handleSearch" class="search-btn">搜索</button>
+        <button v-if="searchKeyword" @click="clearSearch" class="clear-btn">清除</button>
+      </div>
     </div>
     
     <!-- 持仓列表 -->
@@ -201,6 +206,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import api from '../services/api.js';
+import axios from 'axios'; // 直接导入axios
 
 // 状态管理
 const holdings = ref([]);
@@ -210,7 +216,10 @@ const showEditModal = ref(false);
 const showAllocationModal = ref(false);
 const allocationLoading = ref(false);
 const assetAllocation = ref(null);
-
+// 搜索相关状态
+const searchKeyword = ref('');
+const isSearching = ref(false);
+const isSearchActive = ref(false);
 // 新持仓数据
 const newHolding = ref({
   product_code: '',
@@ -285,14 +294,43 @@ const getCategoryText = (category) => {
 const loadHoldings = async () => {
   loading.value = true;
   try {
-    const response = await api.holdings.getAll();
-    holdings.value = response;
+    const response = await axios.get('http://localhost:8000/api/portfolio/');
+    if (response.status === 200 && Array.isArray(response.data)) {
+      holdings.value = response.data;
+    }
   } catch (error) {
     console.error('获取持仓失败:', error);
     alert('获取持仓失败，请稍后重试');
   } finally {
     loading.value = false;
   }
+};
+
+// 搜索持仓
+const handleSearch = async () => {
+  if (!searchKeyword.value.trim()) {
+    alert('请输入搜索关键词');
+    return;
+  }
+  
+  isSearching.value = true;
+  try {
+    const response = await api.holdings.search(searchKeyword.value.trim());
+    holdings.value = response;
+    isSearchActive.value = true;
+  } catch (error) {
+    console.error('搜索持仓失败:', error);
+    alert('搜索持仓失败，请稍后重试');
+  } finally {
+    isSearching.value = false;
+  }
+};
+
+// 清除搜索
+const clearSearch = () => {
+  searchKeyword.value = '';
+  isSearchActive.value = false;
+  loadHoldings();
 };
 
 // 添加持仓
@@ -412,6 +450,39 @@ onMounted(() => {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
+  align-items: center;
+}
+
+.search-container {
+  display: flex;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.search-input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 250px;
+}
+
+.search-btn, .clear-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.search-btn {
+  background-color: #2196F3;
+  color: white;
+}
+
+.clear-btn {
+  background-color: #f44336;
+  color: white;
 }
 
 .sync-btn, .create-btn, .allocation-btn {

@@ -43,29 +43,13 @@ class PortfolioManager:
             list: Holding对象列表
         """
         try:
+            print("调用db_get_all_holdings...")
             holdings = db_get_all_holdings(self.user_id)
-            # 转换为Holding对象（如果是元组格式）
-            holding_objects = []
-            for holding in holdings:
-                if isinstance(holding, tuple):
-                    # 数据库返回的元组格式
-                    holding_obj = Holding.from_dict({
-                        'id': holding[0],
-                        'product_code': holding[1],
-                        'product_name': holding[2],
-                        'product_type': holding[3],
-                        'category': holding[4],
-                        'quantity': holding[5],
-                        'purchase_price': holding[6],
-                        'current_price': holding[7],
-                        'purchase_date': holding[8] if len(holding) > 8 else None
-                    })
-                    holding_objects.append(holding_obj)
-                else:
-                    holding_objects.append(holding)
-            return holding_objects
+            print(f"数据库返回的持仓数量: {len(holdings)}")
+            
+            return holdings
         except Exception as e:
-            print(f"获取持仓失败: {e}")
+            print(f"获取持仓时出错: {e}")
             return []
     
     def add_holding(self, holding_data):
@@ -491,4 +475,6 @@ def calculate_portfolio_stats():
 def calculate_asset_allocation():
     """计算资产配置（向后兼容）"""
     return portfolio_manager.calculate_asset_allocation()
+
+
 

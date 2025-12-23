@@ -10,22 +10,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 导入数据库初始化函数
 from backend.core.database import create_tables, add_category_column_to_holdings
 
-# 创建FastAPI应用
-app = FastAPI(
-    title="八方策金融座舱API",
-    description="金融投资组合管理和资产配置API",
-    version="1.0.0"
-)
-
-# 配置CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 在生产环境中应该设置具体的前端域名
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # 数据库初始化 - 使用新的lifespan事件处理方式
 from contextlib import asynccontextmanager
 
@@ -43,7 +27,7 @@ async def lifespan(app: FastAPI):
     # 关闭时执行（如果需要）
     print("应用正在关闭...")
 
-# 重新创建FastAPI应用，使用新的lifespan
+# 创建FastAPI应用（只创建一次）
 app = FastAPI(
     title="八方策金融座舱API",
     description="金融投资组合管理和资产配置API",
@@ -51,7 +35,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# 重新配置CORS
+# 配置CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 在生产环境中应该设置具体的前端域名
