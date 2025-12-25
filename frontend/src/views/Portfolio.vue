@@ -81,7 +81,7 @@
         <form @submit.prevent="addHolding">
           <div class="form-group">
             <label for="productCode">产品代码</label>
-            <input type="text" id="productCode" v-model="newHolding.product_code" required placeholder="输入6位股票/基金代码">
+            <input type="text" id="productCode" v-model="newHolding.product_code" @input="watchProductCode" required placeholder="输入6位股票/基金代码">
           </div>
           <div class="form-group" v-if="newHolding.product_name">
             <label>产品名称</label>
@@ -93,11 +93,11 @@
           </div>
           <div class="form-group">
             <label for="quantity">持仓份额</label>
-            <input type="number" id="quantity" v-model.number="newHolding.quantity" step="0.01" min="0.01" required>
+            <input type="number" id="quantity" v-model.number="newHolding.quantity" step="0.0001" min="0.0001" required>
           </div>
           <div class="form-group">
             <label for="purchasePrice">持仓成本</label>
-            <input type="number" id="purchasePrice" v-model.number="newHolding.purchase_price" step="0.01" min="0" required>
+            <input type="number" id="purchasePrice" v-model.number="newHolding.purchase_price" step="0.0001" min="0" required>
           </div>
           <div class="form-group">
             <label for="category">资产类别</label>
@@ -143,11 +143,11 @@
           </div>
           <div class="form-group">
             <label for="editQuantity">持仓份额</label>
-            <input type="number" id="editQuantity" v-model.number="editingHolding.quantity" step="0.01" min="0.01" required>
+            <input type="number" id="editQuantity" v-model.number="editingHolding.quantity" step="0.0001" min="0.0001" required>
           </div>
           <div class="form-group">
             <label for="editPurchasePrice">持仓成本</label>
-            <input type="number" id="editPurchasePrice" v-model.number="editingHolding.purchase_price" step="0.01" min="0" required>
+            <input type="number" id="editPurchasePrice" v-model.number="editingHolding.purchase_price" step="0.0001" min="0" required>
           </div>
           <div class="form-group">
             <label for="editCategory">资产类别</label>
@@ -259,8 +259,6 @@ const totalStats = computed(() => {
 // 检查添加表单是否有效
 const isAddFormValid = computed(() => {
   return newHolding.value.product_code && 
-         newHolding.value.product_name && 
-         newHolding.value.product_type && 
          newHolding.value.quantity > 0 && 
          newHolding.value.purchase_price >= 0;
 });
@@ -426,10 +424,21 @@ const resetAddForm = () => {
 };
 
 // 监听产品代码变化，自动获取产品信息
-const watchProductCode = () => {
+const watchProductCode = async () => {
   if (newHolding.value.product_code.length === 6) {
-    // 这里可以添加自动获取产品信息的逻辑
-    // 使用API查询产品信息
+    try {
+      // 使用API查询产品信息
+      const response = await api.holdings.getByCode(newHolding.value.product_code);
+      newHolding.value.product_name = response.product_name;
+      newHolding.value.product_type = response.product_type;
+    } catch (error) {
+      console.error('获取产品信息失败:', error);
+      // 可以添加错误提示或保留原有信息
+    }
+  } else {
+    // 重置产品信息
+    newHolding.value.product_name = '';
+    newHolding.value.product_type = '';
   }
 };
 

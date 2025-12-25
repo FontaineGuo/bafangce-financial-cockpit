@@ -44,6 +44,12 @@ def normalize_number(value):
     # 保留小数点后5位
     return round(value, 5)
 
+# 全局变量用于存储baostock登录状态
+_baostock_login_status = {
+    'is_logged_in': False,
+    'login_date': None  # 记录登录日期
+}
+
 def is_trading_day(date):
     """
     判断指定日期是否为交易日
@@ -58,15 +64,26 @@ def is_trading_day(date):
         # 尝试使用baostock包
         import baostock as bs
         
-        # 初始化baostock连接
-        lg = bs.login()
-        if lg.error_code != '0':
-            print(f"[日志] 登录baostock失败: {lg.error_msg}，将回退到周末判断")
-            bs.logout()
-            # 如果连接失败，回退到简单的周末判断
-            result = date.weekday() < 5
-            print(f"[日志] 结果来源: 周末判断，日期 {date} 是否为交易日: {result}")
-            return result
+        # 获取当前日期
+        current_date = date.today()
+        
+        # 检查是否已经登录并且登录日期是今天
+        if not _baostock_login_status['is_logged_in'] or _baostock_login_status['login_date'] != current_date:
+            # 初始化baostock连接
+            lg = bs.login()
+            if lg.error_code != '0':
+                print(f"[日志] 登录baostock失败: {lg.error_msg}，将回退到周末判断")
+                # 登录失败，回退到简单的周末判断
+                result = date.weekday() < 5
+                print(f"[日志] 结果来源: 周末判断，日期 {date} 是否为交易日: {result}")
+                return result
+            else:
+                # 登录成功，更新登录状态
+                _baostock_login_status['is_logged_in'] = True
+                _baostock_login_status['login_date'] = current_date
+                print(f"[日志] 登录baostock成功")
+        else:
+            print(f"[日志] 已登录baostock，无需重复登录")
         
         # 转换日期格式为字符串
         date_str = date.strftime('%Y-%m-%d')
@@ -100,9 +117,3 @@ def is_trading_day(date):
         result = date.weekday() < 5
         print(f"[日志] 结果来源: 周末判断 (未安装baostock)，日期 {date} 是否为交易日: {result}")
         return result
-    finally:
-        try:
-            # 尝试关闭连接（如果已经打开）
-            bs.logout()
-        except:
-            pass

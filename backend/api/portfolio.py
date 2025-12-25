@@ -32,10 +32,18 @@ async def add_holding(holding_data: Dict[str, Any]):
     """添加新持仓"""
     try:
         # 验证必要字段
-        required_fields = ["product_code", "product_name", "product_type", "quantity", "purchase_price"]
+        required_fields = ["product_code", "category", "quantity", "purchase_price"]
         for field in required_fields:
             if field not in holding_data:
                 raise HTTPException(status_code=400, detail=f"缺少必要字段: {field}")
+
+        # 确保product_type字段存在（使用category作为product_type）
+        if "product_type" not in holding_data:
+            holding_data["product_type"] = holding_data["category"]
+        
+        # 确保product_name字段存在（提供默认值）
+        if "product_name" not in holding_data:
+            holding_data["product_name"] = ""
 
         success, result = portfolio_manager.add_holding(holding_data)
         if not success:
@@ -100,3 +108,16 @@ async def search_holdings(keyword: str):
         return [holding.to_dict() for holding in results]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"搜索持仓失败: {str(e)}")
+
+@router.get("/product/{product_code}", response_model=Dict[str, Any])
+async def get_product_info(product_code: str):
+    """根据产品代码获取产品信息"""
+    try:
+        product_info = portfolio_manager.get_product_info_by_code(product_code)
+        if not product_info:
+            raise HTTPException(status_code=404, detail=f"未找到产品代码为 {product_code} 的产品信息")
+        return product_info
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取产品信息失败: {str(e)}")

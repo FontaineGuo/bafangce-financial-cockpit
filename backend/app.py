@@ -52,12 +52,21 @@ async def health_check():
 
 # 导入API路由
 # 注意：需要在创建app之后导入，避免循环导入
-from backend.api import portfolio
+from backend.api import portfolio, settings
 
 # 注册路由
 app.include_router(portfolio.router, prefix="/api/portfolio", tags=["portfolio"])
+app.include_router(settings.router)
 
 if __name__ == "__main__":
     """主程序入口"""
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import argparse
+    
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description="八方策金融座舱后端服务")
+    parser.add_argument("port", type=int, nargs="?", default=8000, help="服务端口号，默认8000")
+    args = parser.parse_args()
+    
+    # 启动服务器
+    uvicorn.run(app, host="0.0.0.0", port=args.port)

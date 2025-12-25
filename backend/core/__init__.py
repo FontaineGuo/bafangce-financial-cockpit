@@ -33,13 +33,9 @@ from .holdings_manager import (
 
 # AKSHARE客户端
 from .akshare_client import (
-    get_stock_quote,
-    get_etf_quote,
-    get_fund_quote,
-    get_stock_basic_info,
-    get_etf_basic_info,
-    get_fund_basic_info,
-    is_trading_time
+    get_stock_individual_info,
+    get_fund_open_fund_daily,
+    get_fund_etf_fund_daily
 )
 
 # 资产配置监控
@@ -95,13 +91,9 @@ __all__ = [
     'get_holdings_by_category',
     
     # AKSHARE Client
-    'get_stock_quote',
-    'get_etf_quote',
-    'get_fund_quote',
-    'get_stock_basic_info',
-    'get_etf_basic_info',
-    'get_fund_basic_info',
-    'is_trading_time',
+    'get_stock_individual_info',
+    'get_fund_open_fund_daily',
+    'get_fund_etf_fund_daily',
     
     # Asset Allocation
     'AssetAllocationMonitor',

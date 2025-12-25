@@ -78,7 +78,7 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS holdings (
             id INTEGER PRIMARY KEY,
             product_code TEXT NOT NULL,
-            product_name TEXT NOT NULL,
+            product_name TEXT DEFAULT '',
             product_type TEXT NOT NULL,
             category TEXT DEFAULT '',
             quantity FLOAT NOT NULL,

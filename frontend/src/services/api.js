@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: 'http://localhost:8000', // 后端API地址
+  baseURL: 'http://localhost:8001', // 后端API地址 - 端口修改为8001
   timeout: 10000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json'
@@ -30,6 +30,9 @@ export default {
   holdings: {
     // 获取所有持仓
     getAll: () => api.get('/api/portfolio/'),
+    
+    // 根据产品代码获取产品信息
+    getByCode: (product_code) => api.get(`/api/portfolio/product/${product_code}`),
     
     // 添加持仓
     add: (holdingData) => api.post('/api/portfolio/', holdingData),

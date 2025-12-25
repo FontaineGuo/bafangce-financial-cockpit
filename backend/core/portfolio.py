@@ -446,6 +446,36 @@ class PortfolioManager:
         except Exception as e:
             print(f"搜索持仓失败: {e}")
             return []
+    
+    def get_product_info_by_code(self, product_code):
+        """
+        根据产品代码获取产品信息
+        
+        Args:
+            product_code (str): 产品代码
+            
+        Returns:
+            dict: 产品信息
+        """
+        try:
+            # 尝试获取实时数据
+            product_type, product_info = get_realtime_data(product_code)
+            if product_info:
+                result = {
+                    'product_code': product_code,
+                    'product_type': product_type,
+                }
+                
+                # 统一使用'name'键获取产品名称，确保所有产品类型都能正确获取
+                result['product_name'] = product_info.get('name')
+                
+                return result
+            
+            # 如果获取实时数据失败，返回空
+            return None
+        except Exception as e:
+            print(f"获取产品信息失败: {e}")
+            return None
 
 # 全局投资组合管理器实例
 # 用于向后兼容，单用户场景可以直接使用
@@ -475,6 +505,7 @@ def calculate_portfolio_stats():
 def calculate_asset_allocation():
     """计算资产配置（向后兼容）"""
     return portfolio_manager.calculate_asset_allocation()
+
 
 
 
