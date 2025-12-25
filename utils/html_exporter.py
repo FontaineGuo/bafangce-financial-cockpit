@@ -228,7 +228,7 @@ class HtmlExporter:
             output_dir = os.getcwd()
         
         if filename is None:
-            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.datetime.now().date()
             filename = f"holdings_report_{timestamp}.html"
         
         # 确保输出目录存在
@@ -445,7 +445,7 @@ class HtmlExporter:
         
         # 导出到文件
         if filename is None:
-            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.datetime.now().date()
             filename = f"asset_allocation_report_{timestamp}.html"
         
         return self.export_to_file(html_content, output_dir, filename)

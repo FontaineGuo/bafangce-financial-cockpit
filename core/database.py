@@ -1,6 +1,11 @@
 # 数据库操作模块
 import sqlite3
+import os
 from config.constants import DB_PATH
+
+db_dir = os.path.dirname(DB_PATH)
+if not os.path.exists(db_dir):
+    os.makedirs(db_dir)
 
 def connect_db():
     """连接数据库"""

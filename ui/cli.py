@@ -57,37 +57,40 @@ def get_product_info(product_code, max_attempts=3):
     
     # 先尝试作为股票查询（更快）
     print(f"\n尝试获取产品信息: {product_code}")
-    print(f"第 {attempt + 1} 次尝试: 作为股票查询...")
+    print(f"第 {attempt + 1} 次尝试: 作为ETF查询...")
     
-    try:
-        # 检查是否为股票代码格式（6位数字）
-        if not (product_code.isdigit() and len(product_code) == 6):
-            raise ValueError("股票代码应为6位数字")
-        
-        stock_info = get_stock_data(product_code)
-        if stock_info and stock_info.get('stock_name'):
-            print(f"✅ 成功获取股票信息: {stock_info['stock_name']}")
-            return ("stock", stock_info)
-    except Exception as e:
-        print(f"❌ 股票查询失败: {e}")
-    
-    attempt += 1
+
     
     # 如果股票查询失败，尝试作为ETF查询
-    if attempt < max_attempts:
-        print(f"第 {attempt + 1} 次尝试: 作为ETF查询...")
+
         
+    try:
+        # 检查是否为ETF代码格式（通常为6位数字）
+        if not (product_code.isdigit() and len(product_code) == 6):
+            raise ValueError("ETF代码应为6位数字")
+        
+        etf_info = get_etf_data(product_code)
+        if etf_info and etf_info.get('etf_name'):
+            print(f"✅ 成功获取ETF信息: {etf_info['etf_name']}")
+            return ("etf", etf_info)
+        
+    except Exception as e:
+        print(f"❌ ETF查询失败: {e}")
+    
+    attempt += 1
+    if attempt < max_attempts:
         try:
-            # 检查是否为ETF代码格式（通常为6位数字）
+            # 检查是否为股票代码格式（6位数字）
             if not (product_code.isdigit() and len(product_code) == 6):
-                raise ValueError("ETF代码应为6位数字")
+                raise ValueError("股票代码应为6位数字")
             
-            etf_info = get_etf_data(product_code)
-            if etf_info and etf_info.get('etf_name'):
-                print(f"✅ 成功获取ETF信息: {etf_info['etf_name']}")
-                return ("etf", etf_info)
+            
+            stock_info = get_stock_data(product_code)
+            if stock_info and stock_info.get('stock_name'):
+                print(f"✅ 成功获取股票信息: {stock_info['stock_name']}")
+                return ("stock", stock_info)
         except Exception as e:
-            print(f"❌ ETF查询失败: {e}")
+            print(f"❌ 股票查询失败: {e}")
     
     attempt += 1
     
