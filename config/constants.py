@@ -16,11 +16,11 @@ WINDOW_HEIGHT = 600
 DEFAULT_ASSET_ALLOCATION_STRATEGY = {
     'china_stock_etf': {'target_ratio': 0.10, 'max_deviation': 0.03},    # 中国股票或指数ETF 10%，最大偏离3%
     'foreign_stock_etf': {'target_ratio': 0.10, 'max_deviation': 0.03},  # 海外股票或指数ETF 10%，最大偏离3%
-    'commodity': {'target_ratio': 0.10, 'max_deviation': 0.03},         # 大宗商品 10%，最大偏离3%
-    'gold': {'target_ratio': 0.10, 'max_deviation': 0.03},              # 黄金 10%，最大偏离3%
-    'long_bond': {'target_ratio': 0.3, 'max_deviation': 0.03},         # 长债 30%，最大偏离3%
-    'short_bond': {'target_ratio': 0.198, 'max_deviation': 0.03},        # 短债 19.8%，最大偏离3%
-    'credit_bond': {'target_ratio': 0.102, 'max_deviation': 0.03},       # 信用债 10.2%，最大偏离3%
+    'commodity': {'target_ratio': 0.10, 'max_deviation': 0.02},         # 大宗商品 10%，最大偏离3%
+    'gold': {'target_ratio': 0.10, 'max_deviation': 0.02},              # 黄金 10%，最大偏离3%
+    'long_bond': {'target_ratio': 0.3, 'max_deviation': 0.015},         # 长债 30%，最大偏离3%
+    'short_bond': {'target_ratio': 0.198, 'max_deviation': 0.015},        # 短债 19.8%，最大偏离3%
+    'credit_bond': {'target_ratio': 0.102, 'max_deviation': 0.015},       # 信用债 10.2%，最大偏离3%
     'cash': {'target_ratio': 0.0, 'max_deviation': 0.00}               # 现金 0%，最大偏离0%
 }
 
