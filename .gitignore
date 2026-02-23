@@ -35,6 +35,10 @@ build/
 dist/
 *.egg-info/
 
+# 数据库文件
+*.db
+db/*.db
+
 # 测试覆盖率报告
 .coverage
 htmlcov/
@@ -42,3 +46,7 @@ htmlcov/
 # HTML报表文件
 holdings_report_*.html
 asset_allocation_report_*.html
+
+# Node modules
+node_modules/
+frontend/node_modules/
