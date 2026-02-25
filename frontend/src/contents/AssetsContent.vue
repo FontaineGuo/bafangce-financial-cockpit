@@ -1,5 +1,5 @@
 <template>
-  <div class="assets">
+  <div class="assets-content">
     <el-card>
       <template #header>
         <div class="card-header">
@@ -93,7 +93,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAssetsStore } from '@/store/assets'
 import type { Asset, AssetType } from '@/types'
-import { ASSET_TYPE_NAMES, STRATEGY_CATEGORY_NAMES, getDefaultStrategyCategory } from '@/utils/constants'
+import { ASSET_TYPE_NAMES, STRATEGY_CATEGORY_NAMES } from '@/utils/constants'
 
 const assetsStore = useAssetsStore()
 
@@ -101,7 +101,6 @@ const showAddDialog = ref(false)
 const editingAsset = ref<Asset | null>(null)
 const formRef = ref()
 const loading = computed(() => assetsStore.loading)
-
 const assets = computed(() => assetsStore.assets)
 
 const form = reactive({
@@ -170,21 +169,27 @@ async function handleSubmit() {
     if (valid) {
       let result
       if (editingAsset.value) {
-        result = await assetsStore.updateAsset(editingAsset.value.id, form)
+        const updateData = {
+          name: form.name,
+          type: form.type,
+          quantity: form.quantity,
+          cost_price: form.cost_price
+        }
+        result = await assetsStore.updateAsset(editingAsset.value.id, updateData)
         if (result.success) {
           ElMessage.success('更新成功')
+          closeDialog()
+        } else {
+          ElMessage.error(result.error || '更新失败')
         }
       } else {
         result = await assetsStore.addAsset(form)
         if (result.success) {
           ElMessage.success('添加成功')
+          closeDialog()
+        } else {
+          ElMessage.error(result.error || '添加失败')
         }
-      }
-
-      if (result.success) {
-        closeDialog()
-      } else {
-        ElMessage.error(result.error || '操作失败')
       }
     }
   })

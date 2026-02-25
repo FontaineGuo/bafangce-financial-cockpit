@@ -94,7 +94,7 @@
     <el-dialog
       v-model="showDetailDialog"
       :title="`${currentPortfolio?.name} - 详情`"
-      width="900px"
+      width="1000px"
     >
       <div v-if="currentPortfolio" class="portfolio-detail">
         <!-- 基本信息 -->
@@ -116,6 +116,72 @@
               </span>
             </el-descriptions-item>
           </el-descriptions>
+        </div>
+
+        <!-- 资产操作 -->
+        <div class="detail-section">
+          <div class="section-header">
+            <h4>组合资产 ({{ currentPortfolio.assets?.length || 0 }})</h4>
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleShowAddAssetDialog">添加资产</el-button>
+              <el-button type="primary" size="small" @click="handleShowBatchAddAssetDialog">批量添加</el-button>
+            </div>
+          </div>
+
+          <el-table :data="currentPortfolio.assets" stripe v-if="currentPortfolio.assets && currentPortfolio.assets.length > 0">
+            <el-table-column prop="asset_code" label="资产代码" width="120" />
+            <el-table-column prop="asset_name" label="资产名称" width="150" />
+            <el-table-column prop="target_weight" label="目标权重(%)" width="120" />
+            <el-table-column prop="current_weight" label="当前权重(%)" width="120" />
+            <el-table-column prop="allocation_amount" label="分配金额" width="150">
+              <template #default="{ row }">
+                ¥{{ formatNumber(row.allocation_amount) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="盈亏" width="120">
+              <template #default="{ row }">
+                <span v-if="row.asset_profit !== undefined" :class="{ positive: row.asset_profit > 0, negative: row.asset_profit < 0 }">
+                  ¥{{ formatNumber(row.asset_profit) }}
+                </span>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="收益率" width="100">
+              <template #default="{ row }">
+                <span v-if="row.asset_profit_percent !== undefined" :class="{ positive: row.asset_profit_percent > 0, negative: row.asset_profit_percent < 0 }">
+                  {{ row.asset_profit_percent?.toFixed(2) || 0 }}%
+                </span>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="策略分类" width="120">
+              <template #default="{ row }">
+                <el-select
+                  v-model="row.strategy_category"
+                  @change="(value: string) => handleStrategyCategoryChange(row, value)"
+                  size="small"
+                  placeholder="未分类"
+                >
+                  <el-option label="现金" value="cash" />
+                  <el-option label="中国股票/ETF" value="cn_stock_etf" />
+                  <el-option label="海外股票/ETF" value="overseas_stock_etf" />
+                  <el-option label="大宗商品" value="commodity" />
+                  <el-option label="信用债" value="credit_bond" />
+                  <el-option label="长债" value="long_bond" />
+                  <el-option label="短债" value="short_bond" />
+                  <el-option label="黄金" value="gold" />
+                  <el-option label="其他" value="other" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="100">
+              <template #default="{ row }">
+                <el-button size="small" type="danger" @click="handleRemoveAsset(row)">移除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <el-empty v-else description="暂无资产，请点击右上角添加" />
         </div>
 
         <!-- 策略分类分布 -->
@@ -140,27 +206,84 @@
             </div>
           </div>
         </div>
-
-        <!-- 资产列表 -->
-        <div class="detail-section" v-if="currentPortfolio.assets && currentPortfolio.assets.length > 0">
-          <h4>组合资产 ({{ currentPortfolio.assets.length }})</h4>
-          <el-table :data="currentPortfolio.assets" stripe>
-            <el-table-column prop="asset_id" label="资产ID" width="80" />
-            <el-table-column prop="target_weight" label="目标权重(%)" width="120" />
-            <el-table-column prop="current_weight" label="当前权重(%)" width="120" />
-            <el-table-column prop="allocation_amount" label="分配金额" width="150">
-              <template #default="{ row }">
-                ¥{{ formatNumber(row.allocation_amount) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="100">
-              <template #default="{ row }">
-                <el-button size="small" type="danger" @click="handleRemoveAsset(row)">移除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
       </div>
+    </el-dialog>
+
+    <!-- 添加资产对话框 -->
+    <el-dialog
+      v-model="showAddAssetDialog"
+      title="添加资产到组合"
+      width="600px"
+    >
+      <el-form :model="assetForm" :rules="assetRules" ref="assetFormRef" label-width="120px">
+        <el-form-item label="选择资产" prop="asset_id">
+          <el-select
+            v-model="assetForm.asset_id"
+            placeholder="请选择要添加的资产"
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="asset in availableAssets"
+              :key="asset.id"
+              :label="`${asset.code} - ${asset.name}`"
+              :value="asset.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="目标权重(%)" prop="target_weight">
+          <el-input-number
+            v-model="assetForm.target_weight"
+            :min="0"
+            :max="100"
+            :precision="2"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="closeAddAssetDialog">取消</el-button>
+        <el-button type="primary" @click="handleAddAsset" :loading="loading">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量添加资产对话框 -->
+    <el-dialog
+      v-model="showBatchAddAssetDialog"
+      title="批量添加资产到组合"
+      width="800px"
+    >
+      <div class="batch-add-header">
+        <el-alert
+          title="注意：每项资产只能被一个组合持有"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+      </div>
+      <el-transfer
+        v-model="batchSelectedAssets"
+        :data="availableAssetsForTransfer"
+        :titles="['可用资产', '已选择']"
+        filterable
+        filter-placeholder="搜索资产"
+      />
+      <el-form :model="batchForm" :rules="batchRules" ref="batchFormRef" label-width="120px" style="margin-top: 20px">
+        <el-form-item label="默认权重(%)" prop="default_weight">
+          <el-input-number
+            v-model="batchForm.default_weight"
+            :min="0"
+            :max="100"
+            :precision="2"
+            style="width: 100%"
+          />
+          <div class="form-tip">所有选中资产将使用相同的目标权重，添加后可单独调整</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="closeBatchAddAssetDialog">取消</el-button>
+        <el-button type="primary" @click="handleBatchAddAssets" :loading="loading">确定</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -170,20 +293,26 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { usePortfoliosStore } from '@/store/portfolios'
 import { useAssetsStore } from '@/store/assets'
-import { ASSET_TYPE_NAMES, STRATEGY_CATEGORY_NAMES } from '@/utils/constants'
-import type { Portfolio, PortfolioCreate, PortfolioUpdate } from '@/types'
+import { STRATEGY_CATEGORY_NAMES } from '@/utils/constants'
+import type { Portfolio, PortfolioCreate, PortfolioUpdate, PortfolioAssetCreate, PortfolioAssetStrategyCategoryUpdate, StrategyCategory } from '@/types'
 
 const portfoliosStore = usePortfoliosStore()
 const assetsStore = useAssetsStore()
 
 const showCreateDialog = ref(false)
 const showDetailDialog = ref(false)
+const showAddAssetDialog = ref(false)
+const showBatchAddAssetDialog = ref(false)
 const editingPortfolio = ref<Portfolio | null>(null)
 const currentPortfolio = ref<Portfolio | null>(null)
 const formRef = ref()
+const assetFormRef = ref()
+const batchFormRef = ref()
 const loading = computed(() => portfoliosStore.loading)
+const assetsLoading = computed(() => assetsStore.loading)
 
 const portfolios = computed(() => portfoliosStore.portfolios)
+const assets = computed(() => assetsStore.assets)
 
 const form = reactive({
   name: '',
@@ -194,6 +323,49 @@ const rules = {
   name: [{ required: true, message: '请输入组合名称', trigger: 'blur' }]
 }
 
+const assetForm = reactive({
+  asset_id: undefined as number | undefined,
+  target_weight: 0
+})
+
+const assetRules = {
+  asset_id: [{ required: true, message: '请选择资产', trigger: 'change' }],
+  target_weight: [
+    { required: true, message: '请输入目标权重', trigger: 'blur' },
+    { type: 'number', min: 0, max: 100, message: '权重必须在0-100之间', trigger: 'blur' }
+  ]
+}
+
+const batchForm = reactive({
+  default_weight: 0
+})
+
+const batchRules = {
+  default_weight: [
+    { required: true, message: '请输入默认权重', trigger: 'blur' },
+    { type: 'number', min: 0, max: 100, message: '权重必须在0-100之间', trigger: 'blur' }
+  ]
+}
+
+const batchSelectedAssets = ref<number[]>([])
+
+// 可用资产：未在当前组合中的资产
+const availableAssets = computed(() => {
+  if (!currentPortfolio.value) return assets.value
+
+  const portfolioAssetIds = new Set(currentPortfolio.value.assets.map(a => a.asset_id))
+  return assets.value.filter(a => !portfolioAssetIds.has(a.id))
+})
+
+// 批量添加用的资产列表
+const availableAssetsForTransfer = computed(() => {
+  return availableAssets.value.map(asset => ({
+    key: asset.id,
+    label: `${asset.code} - ${asset.name}`,
+    disabled: false
+  }))
+})
+
 const strategyDistribution = ref<any[]>([])
 
 function resetForm() {
@@ -201,10 +373,30 @@ function resetForm() {
   form.description = ''
 }
 
+function resetAssetForm() {
+  assetForm.asset_id = undefined
+  assetForm.target_weight = 0
+}
+
+function resetBatchForm() {
+  batchForm.default_weight = 0
+  batchSelectedAssets.value = []
+}
+
 function closeDialog() {
   showCreateDialog.value = false
   editingPortfolio.value = null
   resetForm()
+}
+
+function closeAddAssetDialog() {
+  showAddAssetDialog.value = false
+  resetAssetForm()
+}
+
+function closeBatchAddAssetDialog() {
+  showBatchAddAssetDialog.value = false
+  resetBatchForm()
 }
 
 async function handleSubmit() {
@@ -267,6 +459,73 @@ async function handleViewPortfolio(portfolio: Portfolio) {
   }
 }
 
+function handleShowAddAssetDialog() {
+  showAddAssetDialog.value = true
+}
+
+async function handleAddAsset() {
+  if (!assetFormRef.value || !currentPortfolio.value) return
+
+  await assetFormRef.value.validate(async (valid: boolean) => {
+    if (valid) {
+      const assetData: PortfolioAssetCreate = {
+        asset_id: assetForm.asset_id!,
+        target_weight: assetForm.target_weight
+      }
+
+      const result = await portfoliosStore.addAssetToPortfolio(currentPortfolio.value!.id, assetData)
+      if (result.success) {
+        ElMessage.success('添加成功')
+        closeAddAssetDialog()
+        // 刷新当前组合
+        await handleViewPortfolio(currentPortfolio.value!)
+      } else {
+        ElMessage.error(result.error || '添加失败')
+      }
+    }
+  })
+}
+
+function handleShowBatchAddAssetDialog() {
+  showBatchAddAssetDialog.value = true
+}
+
+async function handleBatchAddAssets() {
+  if (!batchFormRef.value || !currentPortfolio.value) return
+
+  await batchFormRef.value.validate(async (valid: boolean) => {
+    if (valid) {
+      if (batchSelectedAssets.value.length === 0) {
+        ElMessage.warning('请选择至少一个资产')
+        return
+      }
+
+      const assetList: PortfolioAssetCreate[] = batchSelectedAssets.value.map(assetId => ({
+        asset_id: assetId,
+        target_weight: batchForm.default_weight
+      }))
+
+      const result = await portfoliosStore.batchAddAssetsToPortfolio(currentPortfolio.value!.id, assetList)
+      if (result.success) {
+        const { added_count, conflict_count, conflicts } = result.data!
+        if (added_count > 0) {
+          ElMessage.success(`成功添加 ${added_count} 项资产`)
+        }
+        if (conflict_count > 0) {
+          ElMessage.warning(`${conflict_count} 项资产添加失败（已存在于其他组合）`)
+          // 显示冲突详情
+          console.log('Conflicts:', conflicts)
+        }
+        closeBatchAddAssetDialog()
+        // 刷新当前组合
+        await handleViewPortfolio(currentPortfolio.value!)
+      } else {
+        ElMessage.error(result.error || '批量添加失败')
+      }
+    }
+  })
+}
+
 async function handleRemoveAsset(row: any) {
   if (!currentPortfolio.value) return
 
@@ -292,6 +551,23 @@ async function handleRemoveAsset(row: any) {
   }
 }
 
+async function handleStrategyCategoryChange(row: any, category: StrategyCategory) {
+  if (!currentPortfolio.value) return
+
+  try {
+    const result = await portfoliosStore.updateAssetStrategyCategory(currentPortfolio.value.id, row.asset_id, {
+      strategy_category: category
+    })
+    if (result.success) {
+      ElMessage.success('策略分类更新成功')
+    } else {
+      ElMessage.error(result.error || '更新失败')
+    }
+  } catch (error) {
+    console.error('Update strategy category failed:', error)
+  }
+}
+
 function formatNumber(num: number | undefined): string {
   if (num === undefined) return '0'
   return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -305,8 +581,9 @@ function formatStrategyCategoryName(category: string): string {
   return STRATEGY_CATEGORY_NAMES[category as keyof typeof STRATEGY_CATEGORY_NAMES] || category
 }
 
-onMounted(() => {
-  portfoliosStore.fetchPortfolios()
+onMounted(async () => {
+  await portfoliosStore.fetchPortfolios()
+  await assetsStore.fetchAssets()
 })
 </script>
 
@@ -401,6 +678,25 @@ onMounted(() => {
   margin-bottom: 30px;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.section-header h4 {
+  color: #303133;
+  border-left: 4px solid #409eff;
+  padding-left: 10px;
+  margin: 0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
 .detail-section h4 {
   margin-bottom: 15px;
   color: #303133;
@@ -451,5 +747,15 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.batch-add-header {
+  margin-bottom: 20px;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 </style>

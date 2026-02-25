@@ -102,8 +102,15 @@ async def create_asset(
             detail="资产代码已存在"
         )
 
-    # 获取初始市场数据
+    # 获取初始市场数据并验证代码是否有效
     market_data = mock_data_service.get_market_data(asset.code, asset.type)
+
+    # 验证代码是否存在（市场数据或名称至少有一个存在）
+    if not market_data and not mock_data_service.get_asset_name(asset.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"无效的资产代码 '{asset.code}'：未找到对应的金融产品"
+        )
 
     # 如果未提供名称，从市场数据中获取
     asset_name = asset.name

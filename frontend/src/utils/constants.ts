@@ -1,29 +1,29 @@
 import { AssetType, StrategyCategory } from '@/types'
 
 // 策略分类显示名称映射
-export const STRATEGY_CATEGORY_NAMES: Record<StrategyCategory, string> = {
-  [StrategyCategory.CASH]: '现金',
-  [StrategyCategory.CN_STOCK_ETF]: '国内股票ETF',
-  [StrategyCategory.OVERSEAS_STOCK_ETF]: '海外股票ETF',
-  [StrategyCategory.COMMODITY]: '商品',
-  [StrategyCategory.CREDIT_BOND]: '信用债',
-  [StrategyCategory.LONG_BOND]: '长债',
-  [StrategyCategory.SHORT_BOND]: '短债',
-  [StrategyCategory.GOLD]: '黄金',
-  [StrategyCategory.OTHER]: '其他'
+export const STRATEGY_CATEGORY_NAMES: Record<string, string> = {
+  'cash': '现金',
+  'cn_stock_etf': '国内股票ETF',
+  'overseas_stock_etf': '海外股票ETF',
+  'commodity': '商品',
+  'credit_bond': '信用债',
+  'long_bond': '长债',
+  'short_bond': '短债',
+  'gold': '黄金',
+  'other': '其他'
 }
 
 // 策略分类颜色映射（用于图表）
-export const STRATEGY_CATEGORY_COLORS: Record<StrategyCategory, string> = {
-  [StrategyCategory.CASH]: '#909399',
-  [StrategyCategory.CN_STOCK_ETF]: '#409EFF',
-  [StrategyCategory.OVERSEAS_STOCK_ETF]: '#67C23A',
-  [StrategyCategory.COMMODITY]: '#E6A23C',
-  [StrategyCategory.CREDIT_BOND]: '#F56C6C',
-  [StrategyCategory.LONG_BOND]: '#FF6B6B',
-  [StrategyCategory.SHORT_BOND]: '#FFB74D',
-  [StrategyCategory.GOLD]: '#FFD700',
-  [StrategyCategory.OTHER]: '#C0C4CC'
+export const STRATEGY_CATEGORY_COLORS: Record<string, string> = {
+  'cash': '#909399',
+  'cn_stock_etf': '#409EFF',
+  'overseas_stock_etf': '#67C23A',
+  'commodity': '#E6A23C',
+  'credit_bond': '#F56C6C',
+  'long_bond': '#FF6B6B',
+  'short_bond': '#FFB74D',
+  'gold': '#FFD700',
+  'other': '#C0C4CC'
 }
 
 // 资产类型显示名称
@@ -156,10 +156,10 @@ export function isUserOverrideMapping(mapping?: AssetCategoryMapping): boolean {
   return mapping?.is_user_override ?? false
 }
 
-export function formatStrategyCategoryName(category: StrategyCategory): string {
+export function formatStrategyCategoryName(category: string): string {
   return STRATEGY_CATEGORY_NAMES[category] || category
 }
 
-export function getStrategyCategoryColor(category: StrategyCategory): string {
+export function getStrategyCategoryColor(category: string): string {
   return STRATEGY_CATEGORY_COLORS[category] || '#C0C4CC'
 }

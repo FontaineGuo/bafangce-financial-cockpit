@@ -59,6 +59,7 @@ class Strategy(StrategyBase):
     last_execution: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    conditions: list[StrategyCondition] = []
 
     class Config:
         from_attributes = True

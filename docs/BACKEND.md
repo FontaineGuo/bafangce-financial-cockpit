@@ -1357,7 +1357,718 @@ class AssetService:
             return category_stats
 ```
 
-### 6.3 AI 接口 (api/ai.py)
+### 6.3 投资组合接口 (api/portfolio.py)
+
+投资组合接口管理用户的投资组合，支持创建、更新、删除投资组合，以及将资产添加到投资组合中。
+
+**重要约束**：
+- 每项资产只能被一个组合持有
+- 用户可以创建多个投资组合
+- 资产在添加到新组合前必须从原组合移除
+
+#### 6.3.1 数据模型调整
+
+投资组合与资产的关联通过 `portfolio_assets` 中间表实现：
+
+```sql
+-- 投资组合资产关联表
+CREATE TABLE portfolio_assets (
+    id SERIAL PRIMARY KEY,
+    portfolio_id INTEGER REFERENCES portfolios(id) ON DELETE CASCADE,
+    asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+    target_weight DECIMAL(5, 2) DEFAULT 0,      -- 目标权重（百分比）
+    current_weight DECIMAL(5, 2) DEFAULT 0,     -- 当前权重（百分比，自动计算）
+    allocation_amount DECIMAL(20, 4),              -- 分配金额（自动计算）
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(portfolio_id, asset_id)  -- 确保资产只能在一个组合中
+);
+
+-- 创建索引
+CREATE INDEX idx_portfolio_assets_portfolio ON portfolio_assets(portfolio_id);
+CREATE INDEX idx_portfolio_assets_asset ON portfolio_assets(asset_id);
+```
+
+#### 6.3.2 Pydantic Schemas
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
+
+class PortfolioAssetBase(BaseModel):
+    """投资组合资产基础模型"""
+    asset_id: int = Field(..., description="资产ID")
+    target_weight: float = Field(default=0, ge=0, le=100, description="目标权重（0-100）")
+
+class PortfolioAssetCreate(PortfolioAssetBase):
+    """创建投资组合资产"""
+    pass
+
+class PortfolioAssetStrategyCategoryUpdate(BaseModel):
+    """更新投资组合资产策略分类"""
+    strategy_category: str = Field(..., description="策略分类（参考 StrategyCategory 枚举）")
+
+class PortfolioAssetResponse(BaseModel):
+    """投资组合资产响应模型"""
+    id: int
+    asset_id: int
+    target_weight: float
+    current_weight: float
+    allocation_amount: float
+    asset_code: Optional[str] = Field(None, description="资产代码")
+    asset_name: Optional[str] = Field(None, description="资产名称")
+    strategy_category: Optional[str] = Field(None, description="策略分类")
+    asset_market_value: Optional[float] = Field(None, description="资产市值")
+    asset_profit: Optional[float] = Field(None, description="资产盈亏")
+    asset_profit_percent: Optional[float] = Field(None, description="资产收益率(%)")
+    created_at: datetime
+    updated_at: datetime
+
+class PortfolioBase(BaseModel):
+    """投资组合基础模型"""
+    name: str = Field(..., min_length=1, max_length=100, description="投资组合名称")
+    description: Optional[str] = Field(None, description="投资组合描述")
+    assets: Optional[List[PortfolioAssetCreate]] = Field(default=[], description="初始资产列表")
+
+class PortfolioCreate(PortfolioBase):
+    """创建投资组合"""
+    pass
+
+class PortfolioUpdate(BaseModel):
+    """更新投资组合"""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = None
+
+class PortfolioResponse(PortfolioBase):
+    """投资组合响应模型"""
+    id: int
+    user_id: int
+    name: str
+    description: Optional[str]
+    total_value: float = Field(default=0, description="总市值")
+    total_cost: float = Field(default=0, description="总成本")
+    total_profit: float = Field(default=0, description="总盈亏")
+    total_profit_percent: float = Field(default=0, description="收益率（%）")
+    assets: List[PortfolioAssetResponse] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+class StrategyDistributionItem(BaseModel):
+    """策略分类分布项"""
+    category: str = Field(..., description="策略分类")
+    count: int = Field(default=0, description="资产数量")
+    total_value: float = Field(default=0, description="总市值")
+    percentage: float = Field(default=0, description="占比（%）")
+```
+
+#### 6.3.3 API 端点
+
+```python
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.schemas.portfolio import (
+    PortfolioCreate, PortfolioUpdate, PortfolioResponse,
+    PortfolioAssetCreate, PortfolioAssetResponse,
+    StrategyDistributionItem
+)
+from app.models.portfolio import Portfolio, PortfolioAsset
+from app.models.asset import Asset
+from app.core.auth import get_current_user
+from app.db.session import async_session
+
+router = APIRouter()
+
+@router.get("", response_model=List[PortfolioResponse])
+async def get_portfolios(
+    current_user = Depends(get_current_user)
+):
+    """
+    获取用户的所有投资组合
+    """
+    async with async_session() as session:
+        portfolios = await session.execute(
+            select(Portfolio).where(Portfolio.user_id == current_user.id)
+        )
+        portfolios = portfolios.scalars().all()
+
+        # 为每个组合加载资产并计算统计数据
+        result = []
+        for portfolio in portfolios:
+            result.append(await _calculate_portfolio_stats(session, portfolio))
+        return result
+
+@router.post("", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
+async def create_portfolio(
+    portfolio_data: PortfolioCreate,
+    current_user = Depends(get_current_user)
+):
+    """
+    创建投资组合
+
+    Args:
+        portfolio_data: 投资组合数据（可包含初始资产列表）
+
+    Raises:
+        HTTPException: 资产已在其他组合中时抛出400错误
+    """
+    async with async_session() as session:
+        # 创建投资组合
+        portfolio = Portfolio(
+            user_id=current_user.id,
+            name=portfolio_data.name,
+            description=portfolio_data.description
+        )
+        session.add(portfolio)
+        await session.flush()
+
+        # 如果有初始资产列表，添加资产
+        if portfolio_data.assets:
+            for asset_data in portfolio_data.assets:
+                # 检查资产是否已在其他组合中
+                existing = await session.execute(
+                    select(PortfolioAsset).where(
+                        PortfolioAsset.asset_id == asset_data.asset_id
+                    )
+                )
+                if existing.scalar_one_or_none():
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"资产 {asset_data.asset_id} 已在其他组合中，请先从原组合移除"
+                    )
+
+                # 验证资产所有权
+                asset = await session.execute(
+                    select(Asset).where(
+                        Asset.id == asset_data.asset_id,
+                        Asset.user_id == current_user.id
+                    )
+                )
+                asset = asset.scalar_one_or_none()
+                if not asset:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"资产 {asset_data.asset_id} 不存在"
+                    )
+
+                # 创建关联
+                portfolio_asset = PortfolioAsset(
+                    portfolio_id=portfolio.id,
+                    asset_id=asset_data.asset_id,
+                    target_weight=asset_data.target_weight
+                )
+                session.add(portfolio_asset)
+
+        await session.commit()
+        return await _calculate_portfolio_stats(session, portfolio)
+
+@router.get("/{portfolio_id}", response_model=PortfolioResponse)
+async def get_portfolio(
+    portfolio_id: int,
+    current_user = Depends(get_current_user)
+):
+    """
+    获取单个投资组合详情
+    """
+    async with async_session() as session:
+        portfolio = await session.execute(
+            select(Portfolio).where(
+                Portfolio.id == portfolio_id,
+                Portfolio.user_id == current_user.id
+            )
+        )
+        portfolio = portfolio.scalar_one_or_none()
+        if not portfolio:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="投资组合不存在"
+            )
+        return await _calculate_portfolio_stats(session, portfolio)
+
+@router.put("/{portfolio_id}", response_model=PortfolioResponse)
+async def update_portfolio(
+    portfolio_id: int,
+    portfolio_data: PortfolioUpdate,
+    current_user = Depends(get_current_user)
+):
+    """
+    更新投资组合信息（不包括资产列表）
+    """
+    async with async_session() as session:
+        portfolio = await session.execute(
+            select(Portfolio).where(
+                Portfolio.id == portfolio_id,
+                Portfolio.user_id == current_user.id
+            )
+        )
+        portfolio = portfolio.scalar_one_or_none()
+        if not portfolio:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="投资组合不存在"
+            )
+
+        if portfolio_data.name is not None:
+            portfolio.name = portfolio_data.name
+        if portfolio_data.description is not None:
+            portfolio.description = portfolio_data.description
+
+        portfolio.updated_at = datetime.utcnow()
+        await session.commit()
+
+        return await _calculate_portfolio_stats(session, portfolio)
+
+@router.delete("/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_portfolio(
+    portfolio_id: int,
+    current_user = Depends(get_current_user)
+):
+    """
+    删除投资组合
+    """
+    async with async_session() as session:
+        portfolio = await session.execute(
+            select(Portfolio).where(
+                Portfolio.id == portfolio_id,
+                Portfolio.user_id == current_user.id
+            )
+        )
+        portfolio = portfolio.scalar_one_or_none()
+        if not portfolio:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="投资组合不存在"
+            )
+
+        await session.delete(portfolio)
+        await session.commit()
+
+@router.post("/{portfolio_id}/assets", response_model=PortfolioResponse)
+async def add_asset_to_portfolio(
+    portfolio_id: int,
+    asset_data: PortfolioAssetCreate,
+    current_user = Depends(get_current_user)
+):
+    """
+    向投资组合添加资产
+
+    Raises:
+        HTTPException: 资产已在其他组合中时抛出400错误
+    """
+    async with async_session() as session:
+        # 验证投资组合
+        portfolio = await session.execute(
+            select(Portfolio).where(
+                Portfolio.id == portfolio_id,
+                Portfolio.user_id == current_user.id
+            )
+        )
+        portfolio = portfolio.scalar_one_or_none()
+        if not portfolio:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="投资组合不存在"
+            )
+
+        # 检查资产是否已在其他组合中
+        existing = await session.execute(
+            select(PortfolioAsset).where(
+                PortfolioAsset.asset_id == asset_data.asset_id
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"资产 {asset_data.asset_id} 已在其他组合中，请先从原组合移除"
+            )
+
+        # 验证资产所有权
+        asset = await session.execute(
+            select(Asset).where(
+                Asset.id == asset_data.asset_id,
+                Asset.user_id == current_user.id
+            )
+        )
+        asset = asset.scalar_one_or_none()
+        if not asset:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"资产 {asset_data.asset_id} 不存在"
+            )
+
+        # 创建关联
+        portfolio_asset = PortfolioAsset(
+            portfolio_id=portfolio.id,
+            asset_id=asset_data.asset_id,
+            target_weight=asset_data.target_weight
+        )
+        session.add(portfolio_asset)
+
+        await session.commit()
+        return await _calculate_portfolio_stats(session, portfolio)
+
+@router.delete("/{portfolio_id}/assets/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_asset_from_portfolio(
+    portfolio_id: int,
+    asset_id: int,
+    current_user = Depends(get_current_user)
+):
+    """
+    从投资组合移除资产
+    """
+    async with async_session() as session:
+        # 验证投资组合
+        portfolio = await session.execute(
+            select(Portfolio).where(
+                Portfolio.id == portfolio_id,
+                Portfolio.user_id == current_user.id
+            )
+        )
+        portfolio = portfolio.scalar_one_or_none()
+        if not portfolio:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="投资组合不存在"
+            )
+
+        # 查找关联
+        portfolio_asset = await session.execute(
+            select(PortfolioAsset).where(
+                PortfolioAsset.portfolio_id == portfolio_id,
+                PortfolioAsset.asset_id == asset_id
+            )
+        )
+        portfolio_asset = portfolio_asset.scalar_one_or_none()
+        if not portfolio_asset:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="资产不在此投资组合中"
+            )
+
+        await session.delete(portfolio_asset)
+        await session.commit()
+
+@router.get("/{portfolio_id}/strategy-distribution", response_model=List[StrategyDistributionItem])
+async def get_portfolio_strategy_distribution(
+    portfolio_id: int,
+    current_user = Depends(get_current_user)
+):
+    """
+    获取投资组合的策略分类分布
+
+    Returns:
+        按策略分类统计的资产分布，包括每个分类的资产数量、总市值和占比
+    """
+    async with async_session() as session:
+        # 验证投资组合
+        portfolio = await session.execute(
+            select(Portfolio).where(
+                Portfolio.id == portfolio_id,
+                Portfolio.user_id == current_user.id
+            )
+        )
+        portfolio = portfolio.scalar_one_or_none()
+        if not portfolio:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="投资组合不存在"
+            )
+
+        # 获取组合中的所有资产
+        portfolio_assets = await session.execute(
+            select(PortfolioAsset).where(PortfolioAsset.portfolio_id == portfolio_id)
+        )
+        portfolio_assets = portfolio_assets.scalars().all()
+
+        # 获取资产信息（包括策略分类）
+        distribution = {}
+        total_value = 0
+
+        for pa in portfolio_assets:
+            asset = await session.execute(
+                select(Asset).where(Asset.id == pa.asset_id)
+            )
+            asset = asset.scalar_one()
+
+            # 获取策略分类（使用资产表中的strategy_category字段）
+            category = asset.strategy_category or 'other'
+
+            # 计算市值
+            market_value = asset.market_value or (asset.quantity * asset.cost_price)
+
+            # 统计
+            if category not in distribution:
+                distribution[category] = {
+                    "count": 0,
+                    "total_value": 0
+                }
+
+            distribution[category]["count"] += 1
+            distribution[category]["total_value"] += market_value
+            total_value += market_value
+
+        # 计算百分比
+        result = []
+        for category, data in distribution.items():
+            percentage = (data["total_value"] / total_value * 100) if total_value > 0 else 0
+            result.append(StrategyDistributionItem(
+                category=category,
+                count=data["count"],
+                total_value=data["total_value"],
+                percentage=round(percentage, 2)
+            ))
+
+        return result
+
+@router.post("/{portfolio_id}/assets/batch", response_model=PortfolioResponse)
+async def batch_add_assets_to_portfolio(
+    portfolio_id: int,
+    assets_data: List[PortfolioAssetCreate],
+    current_user = Depends(get_current_user)
+):
+    """
+    批量向投资组合添加资产
+
+    Raises:
+        HTTPException: 任何资产已在其他组合中时抛出400错误，并返回详细错误信息
+    """
+    async with async_session() as session:
+        # 验证投资组合
+        portfolio = await session.execute(
+            select(Portfolio).where(
+                Portfolio.id == portfolio_id,
+                Portfolio.user_id == current_user.id
+            )
+        )
+        portfolio = portfolio.scalar_one_or_none()
+        if not portfolio:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="投资组合不存在"
+            )
+
+        # 检查所有资产是否可用
+        conflicts = []
+        for asset_data in assets_data:
+            existing = await session.execute(
+                select(PortfolioAsset).where(
+                    PortfolioAsset.asset_id == asset_data.asset_id
+                )
+            )
+            if existing.scalar_one_or_none():
+                conflicts.append(asset_data.asset_id)
+
+        if conflicts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "部分资产已在其他组合中",
+                    "conflicts": conflicts
+                }
+            )
+
+        # 验证所有资产所有权
+        for asset_data in assets_data:
+            asset = await session.execute(
+                select(Asset).where(
+                    Asset.id == asset_data.asset_id,
+                    Asset.user_id == current_user.id
+                )
+            )
+            if not asset.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"资产 {asset_data.asset_id} 不存在"
+                )
+
+        # 批量创建关联
+        for asset_data in assets_data:
+            portfolio_asset = PortfolioAsset(
+                portfolio_id=portfolio.id,
+                asset_id=asset_data.asset_id,
+                target_weight=asset_data.target_weight
+            )
+            session.add(portfolio_asset)
+
+        await session.commit()
+        return await _calculate_portfolio_stats(session, portfolio)
+
+@router.put("/{portfolio_id}/assets/{asset_id}/strategy-category", response_model=PortfolioResponse)
+async def update_asset_strategy_category(
+    portfolio_id: int,
+    asset_id: int,
+    strategy_data: PortfolioAssetStrategyCategoryUpdate,
+    current_user = Depends(get_current_user)
+):
+    """
+    更新投资组合中资产的策略分类
+
+    此接口允许用户在投资组合管理界面中直接修改资产的策略分类。
+    策略分类会更新到资产表（assets.strategy_category），所有使用该资产的组合都会受影响。
+
+    Args:
+        portfolio_id: 投资组合ID
+        asset_id: 资产ID
+        strategy_data: 包含 strategy_category 的请求体
+
+    Raises:
+        HTTPException: 组合不存在或资产不在组合中时抛出错误
+
+    Returns:
+        更新后的投资组合数据
+    """
+    async with async_session() as session:
+        # 验证投资组合
+        portfolio = await session.execute(
+            select(Portfolio).where(
+                Portfolio.id == portfolio_id,
+                Portfolio.user_id == current_user.id
+            )
+        )
+        portfolio = portfolio.scalar_one_or_none()
+        if not portfolio:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="投资组合不存在"
+            )
+
+        # 验证资产是否在组合中
+        portfolio_asset = await session.execute(
+            select(PortfolioAsset).where(
+                PortfolioAsset.portfolio_id == portfolio_id,
+                PortfolioAsset.asset_id == asset_id
+            )
+        )
+        portfolio_asset = portfolio_asset.scalar_one_or_none()
+        if not portfolio_asset:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="资产不在此投资组合中"
+            )
+
+        # 获取资产并更新策略分类
+        asset = await session.execute(
+            select(Asset).where(
+                Asset.id == asset_id,
+                Asset.user_id == current_user.id
+            )
+        )
+        asset = asset.scalar_one_or_none()
+        if not asset:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="资产不存在"
+            )
+
+        # 更新策略分类
+        asset.strategy_category = strategy_data.strategy_category
+        await session.commit()
+
+        return await _calculate_portfolio_stats(session, portfolio)
+
+async def _calculate_portfolio_stats(
+    session: AsyncSession,
+    portfolio: Portfolio
+) -> PortfolioResponse:
+    """
+    计算投资组合统计数据
+    """
+    # 获取组合中的所有资产
+    portfolio_assets = await session.execute(
+        select(PortfolioAsset).where(PortfolioAsset.portfolio_id == portfolio.id)
+    )
+    portfolio_assets = portfolio_assets.scalars().all()
+
+    # 计算统计
+    total_value = 0
+    total_cost = 0
+    total_market_value = 0  # 用于计算当前权重
+
+    for pa in portfolio_assets:
+        asset = await session.execute(
+            select(Asset).where(Asset.id == pa.asset_id)
+        )
+        asset = asset.scalar_one()
+
+        # 累加
+        total_cost += asset.quantity * asset.cost_price
+        market_value = asset.market_value or (asset.quantity * asset.cost_price)
+        total_value += market_value
+
+        # 更新分配金额和当前权重
+        pa.allocation_amount = market_value
+        total_market_value += market_value
+
+    # 计算当前权重
+    for pa in portfolio_assets:
+        if total_market_value > 0:
+            pa.current_weight = (pa.allocation_amount / total_market_value) * 100
+        else:
+            pa.current_weight = 0
+
+    total_profit = total_value - total_cost
+    total_profit_percent = (total_profit / total_cost * 100) if total_cost > 0 else 0
+
+    portfolio.total_value = total_value
+    portfolio.total_cost = total_cost
+    portfolio.total_profit = total_profit
+    portfolio.total_profit_percent = total_profit_percent
+
+    return PortfolioResponse.model_validate(portfolio)
+```
+
+#### 6.3.4 接口说明
+
+| 方法 | 路径 | 描述 | 请求体 | 响应 |
+| ----- | ------ | ------ | ------- | ----- |
+| GET | /portfolios | 获取所有投资组合 | - | List[PortfolioResponse] |
+| POST | /portfolios | 创建投资组合 | PortfolioCreate | PortfolioResponse |
+| GET | /portfolios/{id} | 获取单个投资组合 | - | PortfolioResponse |
+| PUT | /portfolios/{id} | 更新投资组合 | PortfolioUpdate | PortfolioResponse |
+| DELETE | /portfolios/{id} | 删除投资组合 | - | 204 No Content |
+| POST | /portfolios/{id}/assets | 向组合添加资产 | PortfolioAssetCreate | PortfolioResponse |
+| DELETE | /portfolios/{id}/assets/{asset_id} | 从组合移除资产 | - | 204 No Content |
+| GET | /portfolios/{id}/strategy-distribution | 获取策略分布 | - | List[StrategyDistributionItem] |
+| POST | /portfolios/{id}/assets/batch | 批量添加资产 | List[PortfolioAssetCreate] | PortfolioResponse |
+| PUT | /portfolios/{id}/assets/{asset_id}/strategy-category | 更新资产策略分类 | PortfolioAssetStrategyCategoryUpdate | PortfolioResponse |
+
+#### 6.3.5 约束与错误处理
+
+**约束**：
+1. 资产唯一性：通过 `UNIQUE(portfolio_id, asset_id)` 约束确保每项资产只能在一个组合中
+2. 用户隔离：所有操作都验证 `user_id`，确保用户只能操作自己的数据
+3. 级联删除：删除投资组合时，自动删除组合中的所有资产关联
+
+**错误响应示例**：
+
+```json
+// 资产已在其他组合中
+{
+  "detail": "资产 123 已在其他组合中，请先从原组合移除"
+}
+
+// 批量添加时的冲突
+{
+  "detail": {
+    "message": "部分资产已在其他组合中",
+    "conflicts": [123, 456, 789]
+  }
+}
+
+// 投资组合不存在
+{
+  "detail": "投资组合不存在"
+}
+
+// 资产不存在或无权访问
+{
+  "detail": "资产 123 不存在"
+}
+```
+
+### 6.4 AI 接口 (api/ai.py)
 
 ```python
 from fastapi import APIRouter, Depends

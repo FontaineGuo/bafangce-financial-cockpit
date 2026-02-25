@@ -48,8 +48,8 @@
             </el-col>
             <el-col :span="6">
               <el-card class="stat-card">
-                <div class="stat-value positive">{{ todayProfit }}</div>
-                <div class="stat-label">今日收益</div>
+                <div class="stat-value positive">{{ totalProfit }}</div>
+                <div class="stat-label">总收益</div>
               </el-card>
             </el-col>
             <el-col :span="6">
@@ -114,7 +114,7 @@ const totalAssets = computed(() => {
     .toFixed(2)
 })
 
-const todayProfit = computed(() => {
+const totalProfit = computed(() => {
   const profit = assetsStore.assets
     .reduce((sum, asset) => sum + (asset.profit || 0), 0)
   return (profit >= 0 ? '+' : '') + profit.toFixed(2)

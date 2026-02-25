@@ -26,10 +26,12 @@ export const useAssetsStore = defineStore('assets', () => {
     try {
       const response = await assetsApi.createAsset(data)
       assets.value.push(response.data.data!)
-      return true
-    } catch (err) {
+      return { success: true }
+    } catch (err: any) {
       console.error('Add asset failed:', err)
-      return false
+      // 提取backend返回的错误信息
+      const errorMessage = err.response?.data?.detail || '添加资产失败'
+      return { success: false, error: errorMessage }
     }
   }
 
@@ -40,10 +42,12 @@ export const useAssetsStore = defineStore('assets', () => {
       if (index !== -1) {
         assets.value[index] = response.data.data!
       }
-      return true
-    } catch (err) {
+      return { success: true }
+    } catch (err: any) {
       console.error('Update asset failed:', err)
-      return false
+      // 提取backend返回的错误信息
+      const errorMessage = err.response?.data?.detail || '更新资产失败'
+      return { success: false, error: errorMessage }
     }
   }
 
@@ -51,10 +55,12 @@ export const useAssetsStore = defineStore('assets', () => {
     try {
       await assetsApi.deleteAsset(id)
       assets.value = assets.value.filter(a => a.id !== id)
-      return true
-    } catch (err) {
+      return { success: true }
+    } catch (err: any) {
       console.error('Delete asset failed:', err)
-      return false
+      // 提取backend返回的错误信息
+      const errorMessage = err.response?.data?.detail || '删除资产失败'
+      return { success: false, error: errorMessage }
     }
   }
 

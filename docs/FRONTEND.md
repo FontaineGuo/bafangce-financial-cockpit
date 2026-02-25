@@ -131,28 +131,167 @@ frontend/
 
 ### 3.4 投资组合页 (Portfolio.vue)
 
-投资组合管理和分析
+投资组合管理和分析，支持将资产添加到投资组合中。
+
+**核心约束**：
+- 每项资产只能被一个投资组合持有
+- 添加资产到新组合前必须从原组合移除
+- 系统会自动检测并阻止重复添加操作
 
 **功能**:
-- 投资组合创建/编辑
+- 投资组合创建/编辑/删除
 - 组合资产配置
+- 向组合添加资产（支持单个和批量）
+- 从组合移除资产
 - 组合收益分析
 - 风险评估
-- 策略分类分布分析（新增）
+- 策略分类分布分析
 - 历史对比
 
 **主要组件**:
-- 组合列表
-- 组合编辑表单
-- 资产配置调整
-- 策略分类分布可视化（新增）
+- 投资组合卡片列表
+- 组合编辑对话框
+- 资产添加对话框（支持选择器）
+- 资产移除确认
+- 批量添加资产对话框
+- 策略分类分布可视化
 - 收益图表
 - 风险指标展示
+
+**资产添加功能**:
+- 支持从用户所有资产中选择未分配的资产
+- 显示资产当前状态（已分配/未分配）
+- 支持设置资产在组合中的目标权重
+- 批量添加时自动检测冲突并提示
+- 移除资产前提供确认对话框
 
 **策略分类分析功能**:
 - 显示按策略分类的资产分布
 - 提供目标权重 vs 当前权重对比
 - 支持按策略分类查看详细资产列表
+- 资产表格中显示每项资产对应的策略分类
+- 支持直接在投资组合界面中修改资产的策略分类
+
+**策略分类显示与编辑**:
+```typescript
+// 投资组合资产包含策略分类
+interface PortfolioAsset {
+  id: number
+  portfolio_id: number
+  asset_id: number
+  asset_code: string
+  asset_name: string
+  strategy_category: StrategyCategory  // 策略分类
+  target_weight: number
+  current_weight: number
+  allocation_amount: number
+  asset_market_value: number
+  asset_profit: number
+  asset_profit_percent: number
+}
+
+// 策略分类枚举
+enum StrategyCategory {
+  CASH = "cash"                    // 现金
+  CN_STOCK_ETF = "cn_stock_etf"        // 中国市场股票与ETF
+  OVERSEAS_STOCK_ETF = "overseas_stock_etf"  // 海外市场股票与ETF
+  COMMODITY = "commodity"            // 大宗商品
+  CREDIT_BOND = "credit_bond"        // 信用债
+  LONG_BOND = "long_bond"            // 长债
+  SHORT_BOND = "short_bond"           // 短债
+  GOLD = "gold"                    // 黄金
+  OTHER = "other"                   // 其他
+}
+```
+
+**策略分类编辑功能**:
+- 点击资产表格中的"策略分类"列可直接修改
+- 下拉选择可用的策略分类选项
+- 修改后实时更新到资产表
+- 所有使用该资产的投资组合都会同步更新
+
+**错误处理**:
+```typescript
+// 策略分类更新请求
+interface UpdateStrategyCategoryRequest {
+  strategy_category: StrategyCategory
+}
+
+// 示例调用
+const updateCategory = async (portfolioId: number, assetId: number, category: StrategyCategory) => {
+  try {
+    await portfoliosApi.updateAssetStrategyCategory(portfolioId, assetId, {
+      strategy_category: category
+    })
+    ElMessage.success('策略分类更新成功')
+    // 刷新组合数据
+    await portfoliosStore.fetchPortfolio(portfolioId)
+  } catch (error) {
+    ElMessage.error('策略分类更新失败')
+  }
+}
+```
+
+**资产分配状态管理**:
+```typescript
+// 资产分配状态类型
+type AssetAllocationStatus = 'unallocated' | 'allocated'
+
+// 资产选择项接口
+interface AssetSelectItem {
+  id: number
+  code: string
+  name: string
+  type: AssetType
+  status: AssetAllocationStatus
+  currentPortfolio?: string  // 当前所在组合名称
+  targetPortfolio?: string  // 目标组合名称
+}
+```
+
+**关键交互流程**:
+
+1. **创建投资组合时添加资产**:
+   - 在创建对话框中选择要包含的资产
+   - 为每项资产设置目标权重
+   - 系统自动验证资产可用性
+   - 创建成功后资产状态更新为"已分配"
+
+2. **向现有组合添加资产**:
+   - 打开资产选择对话框
+   - 显示所有"未分配"资产
+   - 选中要添加的资产
+   - 设置目标权重
+   - 提交后资产状态更新
+
+3. **从组合移除资产**:
+   - 在组合详情中找到资产
+   - 点击"移除"按钮
+   - 确认后资产状态更新为"未分配"
+
+4. **批量操作**:
+   - 支持一次选择多个资产
+   - 批量添加到组合
+   - 系统返回冲突列表（如有）
+   - 成功的资产状态更新，冲突的资产保持原状态
+
+**错误处理**:
+```typescript
+// 资产冲突错误
+interface AssetConflictError {
+  message: string
+  conflicts: number[]  // 冲突的资产ID列表
+}
+
+// 示例响应
+{
+  success: false,
+  error: {
+    message: "部分资产已在其他组合中",
+    conflicts: [123, 456, 789]
+  }
+}
+```
 
 ### 3.5 策略管理页 (Strategies.vue)
 

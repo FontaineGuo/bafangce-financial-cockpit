@@ -1,12 +1,14 @@
 <template>
   <div id="app">
-    <router-view />
+    <MainLayout v-if="userStore.token" />
+    <router-view v-else />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useUserStore } from './store/user'
+import MainLayout from './MainLayout.vue'
 
 const userStore = useUserStore()
 

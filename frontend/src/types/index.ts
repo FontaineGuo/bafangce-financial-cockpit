@@ -18,15 +18,15 @@ export enum AssetType {
 }
 
 export enum StrategyCategory {
-  CASH = 'CASH',
-  CN_STOCK_ETF = 'CN_STOCK_ETF',
-  OVERSEAS_STOCK_ETF = 'OVERSEAS_STOCK_ETF',
-  COMMODITY = 'COMMODITY',
-  CREDIT_BOND = 'CREDIT_BOND',
-  LONG_BOND = 'LONG_BOND',
-  SHORT_BOND = 'SHORT_BOND',
-  GOLD = 'GOLD',
-  OTHER = 'OTHER'
+  CASH = 'cash',
+  CN_STOCK_ETF = 'cn_stock_etf',
+  OVERSEAS_STOCK_ETF = 'overseas_stock_etf',
+  COMMODITY = 'commodity',
+  CREDIT_BOND = 'credit_bond',
+  LONG_BOND = 'long_bond',
+  SHORT_BOND = 'short_bond',
+  GOLD = 'gold',
+  OTHER = 'other'
 }
 
 // ==================== 用户相关类型 ====================
@@ -139,10 +139,19 @@ export interface AssetCategoryMappingUpdate {
 export interface PortfolioAsset {
   id: number
   portfolio_id: number
-  asset_id: int
+  asset_id: number
   target_weight: number
   current_weight: number
   allocation_amount: number
+  asset_code?: string
+  asset_name?: string
+  strategy_category?: string
+  asset_market_value?: number
+  asset_cost?: number
+  asset_profit?: number
+  asset_profit_percent?: number
+  created_at: string
+  updated_at: string
 }
 
 export interface Portfolio {
@@ -162,11 +171,44 @@ export interface Portfolio {
 export interface PortfolioCreate {
   name: string
   description?: string
+  assets?: PortfolioAssetCreate[]
+}
+
+export interface PortfolioAssetCreate {
+  asset_id: number
+  target_weight: number
+}
+
+export interface PortfolioAssetBase {
+  asset_id: number
+  target_weight: number
 }
 
 export interface PortfolioUpdate {
   name?: string
   description?: string
+}
+
+
+export interface PortfolioAssetStrategyCategoryUpdate {
+  strategy_category: StrategyCategory
+}
+
+export interface StrategyDistributionItem {
+  category: string
+  count: number
+  total_value: number
+  percentage: number
+}
+
+export interface BatchAddAssetsResult {
+  added_count: number
+  conflict_count: number
+  conflicts: Array<{
+    asset_id: number
+    asset_code?: string
+    reason: string
+  }>
 }
 
 // ==================== 策略相关类型 ====================
@@ -200,6 +242,7 @@ export interface Strategy {
   last_execution?: string
   created_at: string
   updated_at: string
+  conditions: StrategyCondition[]
 }
 
 export interface StrategyCreate {

@@ -3,7 +3,7 @@
 """
 from datetime import datetime
 from typing import TYPE_CHECKING, List
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from ..core.database import Base
@@ -39,6 +39,10 @@ class Portfolio(Base):
 class PortfolioAsset(Base):
     """投资组合资产关联表"""
     __tablename__ = "portfolio_assets"
+    __table_args__ = (
+        UniqueConstraint('asset_id', name='uq_portfolio_asset_asset_id'),
+        {'comment': '投资组合资产关联表，每项资产只能被一个组合持有'}
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True, comment="组合ID")
@@ -51,6 +55,7 @@ class PortfolioAsset(Base):
 
     # 关系
     portfolio = relationship("Portfolio", back_populates="assets")
+    asset = relationship("Asset", backref="portfolio_association")
 
     def __repr__(self):
         return f"<PortfolioAsset portfolio_id={self.portfolio_id} asset_id={self.asset_id}>"

@@ -29,7 +29,7 @@ class MarketData(BaseModel):
 class AssetBase(BaseModel):
     """资产基础信息"""
     code: str = Field(..., min_length=1, max_length=20)
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    name: Optional[str] = Field(None, max_length=100)
     type: AssetType
     market: str = "CN"
     quantity: float = Field(..., ge=0)
