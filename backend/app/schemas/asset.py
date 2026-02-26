@@ -57,6 +57,11 @@ class AssetUpdate(BaseModel):
     cost_price: Optional[float] = None
 
 
+class AssetStrategyCategoryUpdate(BaseModel):
+    """更新资产策略分类"""
+    strategy_category: str = Field(..., description="策略分类（参考 StrategyCategory 枚举）")
+
+
 class Asset(AssetBase):
     """资产信息"""
     id: int

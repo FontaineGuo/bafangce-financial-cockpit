@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Asset, AssetCreate, AssetUpdate } from '@/types'
+import type { Asset, AssetCreate, AssetUpdate, AssetStrategyCategoryUpdate } from '@/types'
 import { assetsApi } from '@/api/assets'
 
 export const useAssetsStore = defineStore('assets', () => {
@@ -64,6 +64,21 @@ export const useAssetsStore = defineStore('assets', () => {
     }
   }
 
+  async function updateAssetStrategyCategory(id: number, data: AssetStrategyCategoryUpdate) {
+    try {
+      const response = await assetsApi.updateAssetStrategyCategory(id, data)
+      const index = assets.value.findIndex(a => a.id === id)
+      if (index !== -1) {
+        assets.value[index] = response.data.data!
+      }
+      return { success: true }
+    } catch (err: any) {
+      console.error('Update asset strategy category failed:', err)
+      const errorMessage = err.response?.data?.detail || '更新策略分类失败'
+      return { success: false, error: errorMessage }
+    }
+  }
+
   async function refreshAssets() {
     await fetchAssets()
   }
@@ -76,6 +91,7 @@ export const useAssetsStore = defineStore('assets', () => {
     addAsset,
     updateAsset,
     deleteAsset,
+    updateAssetStrategyCategory,
     refreshAssets
   }
 })

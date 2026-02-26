@@ -36,7 +36,22 @@
         </el-table-column>
         <el-table-column prop="strategy_category" label="策略分类" width="150">
           <template #default="{ row }">
-            {{ formatStrategyCategory(row.strategy_category) }}
+            <el-select
+              v-model="row.strategy_category"
+              @change="(value: string) => handleStrategyCategoryChange(row, value)"
+              size="small"
+              placeholder="未分类"
+            >
+              <el-option label="现金" value="CASH" />
+              <el-option label="中国股票/ETF" value="CN_STOCK_ETF" />
+              <el-option label="海外股票/ETF" value="OVERSEAS_STOCK_ETF" />
+              <el-option label="大宗商品" value="COMMODITY" />
+              <el-option label="信用债" value="CREDIT_BOND" />
+              <el-option label="长债" value="LONG_BOND" />
+              <el-option label="短债" value="SHORT_BOND" />
+              <el-option label="黄金" value="GOLD" />
+              <el-option label="其他" value="OTHER" />
+            </el-select>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="150">
@@ -92,7 +107,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAssetsStore } from '@/store/assets'
-import type { Asset, AssetType } from '@/types'
+import type { Asset, AssetType, StrategyCategory, AssetStrategyCategoryUpdate } from '@/types'
 import { ASSET_TYPE_NAMES, STRATEGY_CATEGORY_NAMES } from '@/utils/constants'
 
 const assetsStore = useAssetsStore()
@@ -193,6 +208,21 @@ async function handleSubmit() {
       }
     }
   })
+}
+
+async function handleStrategyCategoryChange(row: Asset, category: StrategyCategory) {
+  try {
+    const result = await assetsStore.updateAssetStrategyCategory(row.id, {
+      strategy_category: category
+    })
+    if (result.success) {
+      ElMessage.success('策略分类更新成功')
+    } else {
+      ElMessage.error(result.error || '更新失败')
+    }
+  } catch (error) {
+    console.error('Update strategy category failed:', error)
+  }
 }
 
 function formatAssetType(type: AssetType): string {

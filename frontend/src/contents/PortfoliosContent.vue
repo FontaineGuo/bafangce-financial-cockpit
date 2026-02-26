@@ -156,22 +156,7 @@
             </el-table-column>
             <el-table-column label="策略分类" width="120">
               <template #default="{ row }">
-                <el-select
-                  v-model="row.strategy_category"
-                  @change="(value: string) => handleStrategyCategoryChange(row, value)"
-                  size="small"
-                  placeholder="未分类"
-                >
-                  <el-option label="现金" value="cash" />
-                  <el-option label="中国股票/ETF" value="cn_stock_etf" />
-                  <el-option label="海外股票/ETF" value="overseas_stock_etf" />
-                  <el-option label="大宗商品" value="commodity" />
-                  <el-option label="信用债" value="credit_bond" />
-                  <el-option label="长债" value="long_bond" />
-                  <el-option label="短债" value="short_bond" />
-                  <el-option label="黄金" value="gold" />
-                  <el-option label="其他" value="other" />
-                </el-select>
+                <span>{{ formatStrategyCategoryName(row.strategy_category || 'OTHER') }}</span>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="100">
@@ -294,7 +279,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { usePortfoliosStore } from '@/store/portfolios'
 import { useAssetsStore } from '@/store/assets'
 import { STRATEGY_CATEGORY_NAMES } from '@/utils/constants'
-import type { Portfolio, PortfolioCreate, PortfolioUpdate, PortfolioAssetCreate, PortfolioAssetStrategyCategoryUpdate, StrategyCategory } from '@/types'
+import type { Portfolio, PortfolioCreate, PortfolioUpdate, PortfolioAssetCreate } from '@/types'
 
 const portfoliosStore = usePortfoliosStore()
 const assetsStore = useAssetsStore()
@@ -548,23 +533,6 @@ async function handleRemoveAsset(row: any) {
     }
   } catch (error) {
     // 用户取消移除
-  }
-}
-
-async function handleStrategyCategoryChange(row: any, category: StrategyCategory) {
-  if (!currentPortfolio.value) return
-
-  try {
-    const result = await portfoliosStore.updateAssetStrategyCategory(currentPortfolio.value.id, row.asset_id, {
-      strategy_category: category
-    })
-    if (result.success) {
-      ElMessage.success('策略分类更新成功')
-    } else {
-      ElMessage.error(result.error || '更新失败')
-    }
-  } catch (error) {
-    console.error('Update strategy category failed:', error)
   }
 }
 

@@ -16,11 +16,6 @@ class PortfolioAssetCreate(PortfolioAssetBase):
     asset_id: int = Field(..., description="资产ID")
 
 
-class PortfolioAssetStrategyCategoryUpdate(BaseModel):
-    """更新投资组合资产策略分类"""
-    strategy_category: str = Field(..., description="策略分类（参考 StrategyCategory 枚举）")
-
-
 class PortfolioAssetResponse(PortfolioAssetBase):
     """组合资产响应"""
     id: int

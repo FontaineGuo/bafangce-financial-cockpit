@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Portfolio, PortfolioCreate, PortfolioUpdate, PortfolioAssetBase, PortfolioAssetCreate, BatchAddAssetsResult, PortfolioAssetStrategyCategoryUpdate } from '@/types'
+import type { Portfolio, PortfolioCreate, PortfolioUpdate, PortfolioAssetBase, PortfolioAssetCreate, BatchAddAssetsResult } from '@/types'
 import { portfoliosApi } from '@/api/portfolios'
 
 export const usePortfoliosStore = defineStore('portfolios', () => {
@@ -133,21 +133,6 @@ export const usePortfoliosStore = defineStore('portfolios', () => {
     }
   }
 
-  async function updateAssetStrategyCategory(portfolioId: number, assetId: number, strategyData: PortfolioAssetStrategyCategoryUpdate) {
-    try {
-      const response = await portfoliosApi.updateAssetStrategyCategory(portfolioId, assetId, strategyData)
-      // 刷新当前投资组合数据
-      if (currentPortfolio.value?.id === portfolioId) {
-        currentPortfolio.value = response.data.data!
-      }
-      return { success: true }
-    } catch (err: any) {
-      console.error('Update asset strategy category failed:', err)
-      const errorMessage = err.response?.data?.detail || '更新策略分类失败'
-      return { success: false, error: errorMessage }
-    }
-  }
-
   async function fetchPortfolioStrategyDistribution(portfolioId: number) {
     try {
       const response = await portfoliosApi.getPortfolioStrategyDistribution(portfolioId)
@@ -183,7 +168,6 @@ export const usePortfoliosStore = defineStore('portfolios', () => {
     addAssetToPortfolio,
     batchAddAssetsToPortfolio,
     removeAssetFromPortfolio,
-    updateAssetStrategyCategory,
     fetchPortfolioStrategyDistribution,
     selectPortfolio,
     clearCurrentPortfolio,

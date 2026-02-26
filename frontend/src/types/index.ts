@@ -18,15 +18,15 @@ export enum AssetType {
 }
 
 export enum StrategyCategory {
-  CASH = 'cash',
-  CN_STOCK_ETF = 'cn_stock_etf',
-  OVERSEAS_STOCK_ETF = 'overseas_stock_etf',
-  COMMODITY = 'commodity',
-  CREDIT_BOND = 'credit_bond',
-  LONG_BOND = 'long_bond',
-  SHORT_BOND = 'short_bond',
-  GOLD = 'gold',
-  OTHER = 'other'
+  CASH = 'CASH',
+  CN_STOCK_ETF = 'CN_STOCK_ETF',
+  OVERSEAS_STOCK_ETF = 'OVERSEAS_STOCK_ETF',
+  COMMODITY = 'COMMODITY',
+  CREDIT_BOND = 'CREDIT_BOND',
+  LONG_BOND = 'LONG_BOND',
+  SHORT_BOND = 'SHORT_BOND',
+  GOLD = 'GOLD',
+  OTHER = 'OTHER'
 }
 
 // ==================== 用户相关类型 ====================
@@ -190,7 +190,7 @@ export interface PortfolioUpdate {
 }
 
 
-export interface PortfolioAssetStrategyCategoryUpdate {
+export interface AssetStrategyCategoryUpdate {
   strategy_category: StrategyCategory
 }
 

@@ -2,28 +2,28 @@ import { AssetType, StrategyCategory } from '@/types'
 
 // 策略分类显示名称映射
 export const STRATEGY_CATEGORY_NAMES: Record<string, string> = {
-  'cash': '现金',
-  'cn_stock_etf': '国内股票ETF',
-  'overseas_stock_etf': '海外股票ETF',
-  'commodity': '商品',
-  'credit_bond': '信用债',
-  'long_bond': '长债',
-  'short_bond': '短债',
-  'gold': '黄金',
-  'other': '其他'
+  'CASH': '现金',
+  'CN_STOCK_ETF': '国内股票ETF',
+  'OVERSEAS_STOCK_ETF': '海外股票ETF',
+  'COMMODITY': '商品',
+  'CREDIT_BOND': '信用债',
+  'LONG_BOND': '长债',
+  'SHORT_BOND': '短债',
+  'GOLD': '黄金',
+  'OTHER': '其他'
 }
 
 // 策略分类颜色映射（用于图表）
 export const STRATEGY_CATEGORY_COLORS: Record<string, string> = {
-  'cash': '#909399',
-  'cn_stock_etf': '#409EFF',
-  'overseas_stock_etf': '#67C23A',
-  'commodity': '#E6A23C',
-  'credit_bond': '#F56C6C',
-  'long_bond': '#FF6B6B',
-  'short_bond': '#FFB74D',
-  'gold': '#FFD700',
-  'other': '#C0C4CC'
+  'CASH': '#909399',
+  'CN_STOCK_ETF': '#409EFF',
+  'OVERSEAS_STOCK_ETF': '#67C23A',
+  'COMMODITY': '#E6A23C',
+  'CREDIT_BOND': '#F56C6C',
+  'LONG_BOND': '#FF6B6B',
+  'SHORT_BOND': '#FFB74D',
+  'GOLD': '#FFD700',
+  'OTHER': '#C0C4CC'
 }
 
 // 资产类型显示名称

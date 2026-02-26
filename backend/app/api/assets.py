@@ -14,7 +14,13 @@ from ..core.database import get_db
 from ..models.user import User
 from ..models.asset import Asset
 from ..models.enums import AssetType
-from ..schemas.asset import Asset as AssetSchema, AssetCreate, AssetUpdate, MarketData
+from ..schemas.asset import (
+    Asset as AssetSchema,
+    AssetCreate,
+    AssetUpdate,
+    AssetStrategyCategoryUpdate,
+    MarketData
+)
 from ..schemas.common import Response, PaginatedResponse
 from ..utils.auth import get_current_active_user
 from ..services.mock_data import mock_data_service
@@ -215,6 +221,32 @@ async def delete_asset(
     db.delete(db_asset)
     db.commit()
     return Response.success_response(message="删除成功")
+
+
+@router.put("/{asset_id}/strategy-category", response_model=Response[AssetSchema])
+async def update_asset_strategy_category(
+    asset_id: int,
+    strategy_data: AssetStrategyCategoryUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """更新资产的策略分类"""
+    db_asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == current_user.id
+    ).first()
+
+    if not db_asset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="资产不存在"
+        )
+
+    # 更新策略分类
+    db_asset.strategy_category = strategy_data.strategy_category
+    db.commit()
+
+    return Response.success_response(data=db_asset)
 
 
 @router.get("/{asset_code}/market-data", response_model=Response[MarketData])

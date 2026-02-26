@@ -16,7 +16,6 @@ from ..schemas.portfolio import (
     PortfolioUpdate,
     PortfolioAssetCreate,
     PortfolioAssetResponse,
-    PortfolioAssetStrategyCategoryUpdate,
     StrategyDistributionItem,
 )
 from ..schemas.common import Response
@@ -69,6 +68,7 @@ def _portfolio_asset_to_response(pa: PortfolioAsset, asset: Optional[Asset] = No
         asset_data = {
             "asset_code": asset.code,
             "asset_name": asset.name,
+            "strategy_category": asset.strategy_category,
             "asset_market_value": asset.market_value,
             "asset_cost": asset.quantity * asset.cost_price if asset.quantity and asset.cost_price else None,
             "asset_profit": asset.profit,
@@ -524,82 +524,6 @@ async def remove_asset_from_portfolio(
     _calculate_portfolio_stats(db, portfolio_id)
 
     return Response.success_response(message="资产移除成功")
-
-
-@router.put("/{portfolio_id}/assets/{asset_id}/strategy-category", response_model=Response[PortfolioSchema])
-async def update_asset_strategy_category(
-    portfolio_id: int,
-    asset_id: int,
-    strategy_data: PortfolioAssetStrategyCategoryUpdate,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """更新投资组合中资产的策略分类"""
-    # 验证投资组合
-    db_portfolio = db.query(Portfolio).filter(
-        Portfolio.id == portfolio_id,
-        Portfolio.user_id == current_user.id
-    ).first()
-
-    if not db_portfolio:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="投资组合不存在"
-        )
-
-    # 验证资产是否在组合中
-    portfolio_asset = db.query(PortfolioAsset).filter(
-        PortfolioAsset.portfolio_id == portfolio_id,
-        PortfolioAsset.asset_id == asset_id
-    ).first()
-
-    if not portfolio_asset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="资产不在此投资组合中"
-        )
-
-    # 获取资产并更新策略分类
-    db_asset = db.query(Asset).filter(
-        Asset.id == asset_id,
-        Asset.user_id == current_user.id
-    ).first()
-
-    if not db_asset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="资产不存在"
-        )
-
-    # 更新策略分类
-    db_asset.strategy_category = strategy_data.strategy_category
-    db.commit()
-
-    # 计算组合统计
-    _calculate_portfolio_stats(db, portfolio_id)
-    db.refresh(db_portfolio)
-
-    # 转换资产为响应格式
-    assets_data = []
-    for pa in db_portfolio.assets:
-        asset = db.query(Asset).filter(Asset.id == pa.asset_id).first()
-        assets_data.append(_portfolio_asset_to_response(pa, asset))
-
-    portfolio_dict = {
-        "id": db_portfolio.id,
-        "user_id": db_portfolio.user_id,
-        "name": db_portfolio.name,
-        "description": db_portfolio.description,
-        "total_value": db_portfolio.total_value,
-        "total_cost": db_portfolio.total_cost,
-        "total_profit": db_portfolio.total_profit,
-        "total_profit_percent": db_portfolio.total_profit_percent,
-        "assets": assets_data,
-        "created_at": db_portfolio.created_at,
-        "updated_at": db_portfolio.updated_at,
-    }
-
-    return Response.success_response(data=PortfolioSchema(**portfolio_dict))
 
 
 @router.get("/{portfolio_id}/strategy-distribution", response_model=Response[List[StrategyDistributionItem]])

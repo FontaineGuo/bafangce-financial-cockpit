@@ -7,8 +7,7 @@ import type {
   PortfolioAssetBase,
   PortfolioAssetCreate,
   StrategyDistributionItem,
-  BatchAddAssetsResult,
-  PortfolioAssetStrategyCategoryUpdate
+  BatchAddAssetsResult
 } from '@/types'
 
 export const portfoliosApi = {
@@ -50,11 +49,6 @@ export const portfoliosApi = {
   // 从投资组合移除资产
   removeAssetFromPortfolio: (portfolioId: number, assetId: number) => {
     return apiClient.delete<ApiResponse<null>>(`/portfolios/${portfolioId}/assets/${assetId}`)
-  },
-
-  // 更新投资组合中资产的策略分类
-  updateAssetStrategyCategory: (portfolioId: number, assetId: number, strategyData: PortfolioAssetStrategyCategoryUpdate) => {
-    return apiClient.put<ApiResponse<Portfolio>>(`/portfolios/${portfolioId}/assets/${assetId}/strategy-category`, strategyData)
   },
 
   // 获取投资组合的策略分类分布

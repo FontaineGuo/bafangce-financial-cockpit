@@ -1,5 +1,5 @@
 import apiClient from './index'
-import type { Asset, AssetCreate, AssetUpdate, MarketData, AssetType, ApiResponse } from '@/types'
+import type { Asset, AssetCreate, AssetUpdate, AssetStrategyCategoryUpdate, MarketData, AssetType, ApiResponse } from '@/types'
 
 export const assetsApi = {
   // 获取资产列表
@@ -25,6 +25,11 @@ export const assetsApi = {
   // 删除资产
   deleteAsset: (id: number) => {
     return apiClient.delete<ApiResponse<null>>(`/assets/${id}`)
+  },
+
+  // 更新资产策略分类
+  updateAssetStrategyCategory: (id: number, data: AssetStrategyCategoryUpdate) => {
+    return apiClient.put<ApiResponse<Asset>>(`/assets/${id}/strategy-category`, data)
   },
 
   // 获取资产市场数据

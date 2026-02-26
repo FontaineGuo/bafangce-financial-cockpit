@@ -537,11 +537,15 @@ CREATE TABLE user_asset_category_mappings (
 新增用户自定义分类映射的API：
 
 ```python
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict
-from app.schemas.asset import AssetCategoryMapping
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.schemas.asset import AssetCategoryMapping, AssetStrategyCategoryUpdate
+from app.models.asset import Asset
 from app.services.asset_category_mapping_service import AssetCategoryMappingService
 from app.core.auth import get_current_user
+from app.db.session import async_session
 
 router = APIRouter()
 
@@ -575,26 +579,89 @@ async def update_category_mappings(
 @router.get("/{asset_id}/strategy-category")
 async def get_asset_strategy_category(
     asset_id: int,
-    current_user = Depends(get_current_user),
-    mapping_service: AssetCategoryMappingService = Depends()
+    current_user = Depends(get_current_user)
 ):
     """获取单个资产的策略分类"""
-    category = await mapping_service.get_asset_category(current_user.id, asset_id)
-    return {"asset_id": asset_id, "strategy_category": category.value}
+    async with async_session() as session:
+        asset = await session.execute(
+            select(Asset).where(
+                Asset.id == asset_id,
+                Asset.user_id == current_user.id
+            )
+        )
+        asset = asset.scalar_one_or_none()
+        if not asset:
+            raise HTTPException(
+                status_code=404,
+                detail="资产不存在"
+            )
+        return {"asset_id": asset_id, "strategy_category": asset.strategy_category}
 
 @router.put("/{asset_id}/strategy-category")
 async def update_asset_strategy_category(
     asset_id: int,
-    category: str,
-    current_user = Depends(get_current_user),
-    mapping_service: AssetCategoryMappingService = Depends()
+    strategy_data: AssetStrategyCategoryUpdate,
+    current_user = Depends(get_current_user)
 ):
-    """手动设置单个资产的策略分类"""
-    await mapping_service.set_asset_category(
-        current_user.id, asset_id, StrategyCategory(category)
-    )
-    return {"message": "Strategy category updated successfully"}
+    """
+    手动设置单个资产的策略分类
+
+    此接口直接更新资产表（assets.strategy_category）中的策略分类。
+    策略分类是资产的全局属性，不是组合特定的。
+
+    Args:
+        asset_id: 资产ID
+        strategy_data: 包含 strategy_category 的请求体
+
+    Raises:
+        HTTPException: 资产不存在或无权访问时抛出错误
+
+    Returns:
+        更新后的资产数据
+    """
+    async with async_session() as session:
+        asset = await session.execute(
+            select(Asset).where(
+                Asset.id == asset_id,
+                Asset.user_id == current_user.id
+            )
+        )
+        asset = asset.scalar_one_or_none()
+        if not asset:
+            raise HTTPException(
+                status_code=404,
+                detail="资产不存在"
+            )
+
+        asset.strategy_category = strategy_data.strategy_category
+        await session.commit()
+        await session.refresh(asset)
+        return asset
 ```
+
+#### Pydantic Schema: AssetStrategyCategoryUpdate
+
+```python
+from pydantic import BaseModel, Field
+
+class AssetStrategyCategoryUpdate(BaseModel):
+    """更新资产策略分类"""
+    strategy_category: str = Field(..., description="策略分类（参考 StrategyCategory 枚举）")
+```
+
+**策略分类枚举值：**
+
+| 枚举值 | 名称 | 说明 |
+| ------ | ------ | ------ |
+| CASH | 现金 | 现金及现金等价物 |
+| CN_STOCK_ETF | 中国股票/ETF | 中国A股及中国市场的股票、ETF、LOF基金 |
+| OVERSEAS_STOCK_ETF | 海外股票/ETF | 海外市场的股票、ETF基金 |
+| COMMODITY | 大宗商品 | 大宗商品类资产 |
+| CREDIT_BOND | 信用债 | 信用类债券基金 |
+| LONG_BOND | 长债 | 长期债券基金 |
+| SHORT_BOND | 短债 | 短期债券基金 |
+| GOLD | 黄金 | 黄金及贵金属类资产 |
+| OTHER | 其他 | 其他类资产 |
 
 ### 4.8 策略分类统计接口
 
@@ -1141,9 +1208,13 @@ async def refresh_token(refresh_token: str, auth_service: AuthService = Depends(
 ```python
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
-from app.schemas.asset import AssetCreate, AssetUpdate, AssetResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.schemas.asset import AssetCreate, AssetUpdate, AssetResponse, AssetStrategyCategoryUpdate
+from app.models.asset import Asset
 from app.services.asset_service import AssetService
 from app.core.auth import get_current_user
+from app.db.session import async_session
 
 router = APIRouter()
 
@@ -1243,25 +1314,64 @@ async def update_category_mappings(
 @router.get("/{asset_id}/strategy-category")
 async def get_asset_strategy_category(
     asset_id: int,
-    current_user = Depends(get_current_user),
-    mapping_service: AssetCategoryMappingService = Depends()
+    current_user = Depends(get_current_user)
 ):
     """获取单个资产的策略分类"""
-    category = await mapping_service.get_asset_category(current_user.id, asset_id)
-    return {"asset_id": asset_id, "strategy_category": category.value}
+    async with async_session() as session:
+        asset = await session.execute(
+            select(Asset).where(
+                Asset.id == asset_id,
+                Asset.user_id == current_user.id
+            )
+        )
+        asset = asset.scalar_one_or_none()
+        if not asset:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="资产不存在"
+            )
+        return {"asset_id": asset_id, "strategy_category": asset.strategy_category}
 
 @router.put("/{asset_id}/strategy-category")
 async def update_asset_strategy_category(
     asset_id: int,
-    category: str,
-    current_user = Depends(get_current_user),
-    mapping_service: AssetCategoryMappingService = Depends()
+    strategy_data: AssetStrategyCategoryUpdate,
+    current_user = Depends(get_current_user)
 ):
-    """手动设置单个资产的策略分类"""
-    await mapping_service.set_asset_category(
-        current_user.id, asset_id, StrategyCategory(category)
-    )
-    return {"message": "Strategy category updated successfully"}
+    """
+    手动设置单个资产的策略分类
+
+    此接口直接更新资产表（assets.strategy_category）中的策略分类。
+    策略分类是资产的全局属性，不是组合特定的。
+
+    Args:
+        asset_id: 资产ID
+        strategy_data: 包含 strategy_category 的请求体
+
+    Raises:
+        HTTPException: 资产不存在或无权访问时抛出错误
+
+    Returns:
+        更新后的资产数据
+    """
+    async with async_session() as session:
+        asset = await session.execute(
+            select(Asset).where(
+                Asset.id == asset_id,
+                Asset.user_id == current_user.id
+            )
+        )
+        asset = asset.scalar_one_or_none()
+        if not asset:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="资产不存在"
+            )
+
+        asset.strategy_category = strategy_data.strategy_category
+        await session.commit()
+        await session.refresh(asset)
+        return asset
 
 @router.get("/portfolio/by-strategy-category")
 async def get_portfolio_by_strategy_category(
@@ -1404,10 +1514,6 @@ class PortfolioAssetBase(BaseModel):
 class PortfolioAssetCreate(PortfolioAssetBase):
     """创建投资组合资产"""
     pass
-
-class PortfolioAssetStrategyCategoryUpdate(BaseModel):
-    """更新投资组合资产策略分类"""
-    strategy_category: str = Field(..., description="策略分类（参考 StrategyCategory 枚举）")
 
 class PortfolioAssetResponse(BaseModel):
     """投资组合资产响应模型"""
@@ -1895,79 +2001,6 @@ async def batch_add_assets_to_portfolio(
         await session.commit()
         return await _calculate_portfolio_stats(session, portfolio)
 
-@router.put("/{portfolio_id}/assets/{asset_id}/strategy-category", response_model=PortfolioResponse)
-async def update_asset_strategy_category(
-    portfolio_id: int,
-    asset_id: int,
-    strategy_data: PortfolioAssetStrategyCategoryUpdate,
-    current_user = Depends(get_current_user)
-):
-    """
-    更新投资组合中资产的策略分类
-
-    此接口允许用户在投资组合管理界面中直接修改资产的策略分类。
-    策略分类会更新到资产表（assets.strategy_category），所有使用该资产的组合都会受影响。
-
-    Args:
-        portfolio_id: 投资组合ID
-        asset_id: 资产ID
-        strategy_data: 包含 strategy_category 的请求体
-
-    Raises:
-        HTTPException: 组合不存在或资产不在组合中时抛出错误
-
-    Returns:
-        更新后的投资组合数据
-    """
-    async with async_session() as session:
-        # 验证投资组合
-        portfolio = await session.execute(
-            select(Portfolio).where(
-                Portfolio.id == portfolio_id,
-                Portfolio.user_id == current_user.id
-            )
-        )
-        portfolio = portfolio.scalar_one_or_none()
-        if not portfolio:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="投资组合不存在"
-            )
-
-        # 验证资产是否在组合中
-        portfolio_asset = await session.execute(
-            select(PortfolioAsset).where(
-                PortfolioAsset.portfolio_id == portfolio_id,
-                PortfolioAsset.asset_id == asset_id
-            )
-        )
-        portfolio_asset = portfolio_asset.scalar_one_or_none()
-        if not portfolio_asset:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="资产不在此投资组合中"
-            )
-
-        # 获取资产并更新策略分类
-        asset = await session.execute(
-            select(Asset).where(
-                Asset.id == asset_id,
-                Asset.user_id == current_user.id
-            )
-        )
-        asset = asset.scalar_one_or_none()
-        if not asset:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="资产不存在"
-            )
-
-        # 更新策略分类
-        asset.strategy_category = strategy_data.strategy_category
-        await session.commit()
-
-        return await _calculate_portfolio_stats(session, portfolio)
-
 async def _calculate_portfolio_stats(
     session: AsyncSession,
     portfolio: Portfolio
@@ -2032,7 +2065,6 @@ async def _calculate_portfolio_stats(
 | DELETE | /portfolios/{id}/assets/{asset_id} | 从组合移除资产 | - | 204 No Content |
 | GET | /portfolios/{id}/strategy-distribution | 获取策略分布 | - | List[StrategyDistributionItem] |
 | POST | /portfolios/{id}/assets/batch | 批量添加资产 | List[PortfolioAssetCreate] | PortfolioResponse |
-| PUT | /portfolios/{id}/assets/{asset_id}/strategy-category | 更新资产策略分类 | PortfolioAssetStrategyCategoryUpdate | PortfolioResponse |
 
 #### 6.3.5 约束与错误处理
 

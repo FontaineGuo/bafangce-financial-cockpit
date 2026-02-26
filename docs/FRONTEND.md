@@ -125,9 +125,33 @@ frontend/
 
 **策略分类管理功能**:
 - 显示资产的当前策略分类
-- 标识系统自动映射 vs 用户自定义覆盖
-- 支持单个或批量修改资产策略分类
-- 提供恢复默认分类选项
+- 支持在资产列表中直接修改策略分类（通过下拉选择）
+- 修改后实时更新到后端资产表
+- 所有使用该资产的投资组合都会同步显示更新后的策略分类
+- 提供格式化的策略分类名称显示（中文）
+
+**策略分类编辑API调用**:
+
+```typescript
+// 策略分类更新请求
+interface AssetStrategyCategoryUpdate {
+  strategy_category: StrategyCategory
+}
+
+// 示例调用（在资产页面）
+const updateStrategyCategory = async (assetId: number, category: StrategyCategory) => {
+  try {
+    await assetsApi.updateAssetStrategyCategory(assetId, {
+      strategy_category: category
+    })
+    ElMessage.success('策略分类更新成功')
+    // 刷新资产数据
+    await assetsStore.fetchAssets()
+  } catch (error) {
+    ElMessage.error('策略分类更新失败')
+  }
+}
+```
 
 ### 3.4 投资组合页 (Portfolio.vue)
 
@@ -169,19 +193,20 @@ frontend/
 - 显示按策略分类的资产分布
 - 提供目标权重 vs 当前权重对比
 - 支持按策略分类查看详细资产列表
-- 资产表格中显示每项资产对应的策略分类
-- 支持直接在投资组合界面中修改资产的策略分类
+- 资产表格中显示每项资产对应的策略分类（只读）
 
-**策略分类显示与编辑**:
+**重要说明**: 策略分类是资产的全局属性，不应在投资组合界面中修改。如需修改资产的策略分类，请前往"资产管理"页面进行操作。投资组合界面仅显示资产的策略分类，用于分析和展示目的。
+
+**策略分类显示（只读）**:
 ```typescript
-// 投资组合资产包含策略分类
+// 投资组合资产包含策略分类（仅显示，不可编辑）
 interface PortfolioAsset {
   id: number
   portfolio_id: number
   asset_id: number
   asset_code: string
   asset_name: string
-  strategy_category: StrategyCategory  // 策略分类
+  strategy_category: StrategyCategory  // 策略分类（只读）
   target_weight: number
   current_weight: number
   allocation_amount: number
@@ -192,43 +217,15 @@ interface PortfolioAsset {
 
 // 策略分类枚举
 enum StrategyCategory {
-  CASH = "cash"                    // 现金
-  CN_STOCK_ETF = "cn_stock_etf"        // 中国市场股票与ETF
-  OVERSEAS_STOCK_ETF = "overseas_stock_etf"  // 海外市场股票与ETF
-  COMMODITY = "commodity"            // 大宗商品
-  CREDIT_BOND = "credit_bond"        // 信用债
-  LONG_BOND = "long_bond"            // 长债
-  SHORT_BOND = "short_bond"           // 短债
-  GOLD = "gold"                    // 黄金
-  OTHER = "other"                   // 其他
-}
-```
-
-**策略分类编辑功能**:
-- 点击资产表格中的"策略分类"列可直接修改
-- 下拉选择可用的策略分类选项
-- 修改后实时更新到资产表
-- 所有使用该资产的投资组合都会同步更新
-
-**错误处理**:
-```typescript
-// 策略分类更新请求
-interface UpdateStrategyCategoryRequest {
-  strategy_category: StrategyCategory
-}
-
-// 示例调用
-const updateCategory = async (portfolioId: number, assetId: number, category: StrategyCategory) => {
-  try {
-    await portfoliosApi.updateAssetStrategyCategory(portfolioId, assetId, {
-      strategy_category: category
-    })
-    ElMessage.success('策略分类更新成功')
-    // 刷新组合数据
-    await portfoliosStore.fetchPortfolio(portfolioId)
-  } catch (error) {
-    ElMessage.error('策略分类更新失败')
-  }
+  CASH = "CASH"                    // 现金
+  CN_STOCK_ETF = "CN_STOCK_ETF"        // 中国市场股票与ETF
+  OVERSEAS_STOCK_ETF = "OVERSEAS_STOCK_ETF"  // 海外市场股票与ETF
+  COMMODITY = "COMMODITY"            // 大宗商品
+  CREDIT_BOND = "CREDIT_BOND"        // 信用债
+  LONG_BOND = "LONG_BOND"            // 长债
+  SHORT_BOND = "SHORT_BOND"           // 短债
+  GOLD = "GOLD"                    // 黄金
+  OTHER = "OTHER"                   // 其他
 }
 ```
 
@@ -592,6 +589,23 @@ export default apiClient
 - `updateAsset(id, data)`: 更新资产
 - `deleteAsset(id)`: 删除资产
 - `getAssetPrices(codes)`: 批量获取资产价格
+- `updateAssetStrategyCategory(id, data)`: 更新资产的策略分类
+
+**示例请求**:
+
+```typescript
+// 更新资产策略分类
+const updateStrategyCategory = async (assetId: number, category: StrategyCategory) => {
+  try {
+    await assetsApi.updateAssetStrategyCategory(assetId, {
+      strategy_category: category
+    })
+    ElMessage.success('策略分类更新成功')
+  } catch (error) {
+    ElMessage.error('策略分类更新失败')
+  }
+}
+```
 
 ### 6.4 AI API (api/ai.ts)
 
