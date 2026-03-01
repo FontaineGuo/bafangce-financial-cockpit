@@ -11,7 +11,7 @@ from ..core.database import Base
 if TYPE_CHECKING:
     from .asset import Asset
     from .portfolio import Portfolio
-    from .strategy import Strategy
+    from .strategy import StrategyGroup
     from .asset_category_mapping import AssetCategoryMapping
 
 
@@ -31,7 +31,7 @@ class User(Base):
     # 关系
     assets = relationship("Asset", back_populates="user", cascade="all, delete-orphan")
     portfolios = relationship("Portfolio", back_populates="user", cascade="all, delete-orphan")
-    strategies = relationship("Strategy", back_populates="user", cascade="all, delete-orphan")
+    strategy_groups = relationship("StrategyGroup", back_populates="user", cascade="all, delete-orphan")
     category_mappings = relationship("AssetCategoryMapping", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):

@@ -29,9 +29,9 @@
               <el-icon><DataLine /></el-icon>
               <span>投资组合</span>
             </el-menu-item>
-            <el-menu-item index="strategies">
-              <el-icon><TrendCharts /></el-icon>
-              <span>策略管理</span>
+            <el-menu-item index="strategy-groups">
+              <el-icon><List /></el-icon>
+              <span>策略组管理</span>
             </el-menu-item>
             <el-menu-item index="ai-advisor">
               <el-icon><MagicStick /></el-icon>
@@ -45,7 +45,7 @@
           <DashboardContent v-if="activeTab === 'dashboard'" />
           <AssetsContent v-if="activeTab === 'assets'" />
           <PortfoliosContent v-if="activeTab === 'portfolios'" />
-          <StrategiesContent v-if="activeTab === 'strategies'" />
+          <StrategyGroupsContent v-if="activeTab === 'strategy-groups'" />
           <AIAdvisorContent v-if="activeTab === 'ai-advisor'" />
         </el-main>
       </el-container>
@@ -57,12 +57,12 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { HomeFilled, Wallet, DataLine, TrendCharts, MagicStick } from '@element-plus/icons-vue'
+import { HomeFilled, Wallet, DataLine, List, MagicStick } from '@element-plus/icons-vue'
 import { useUserStore } from './store/user'
 import DashboardContent from './contents/DashboardContent.vue'
 import AssetsContent from './contents/AssetsContent.vue'
 import PortfoliosContent from './contents/PortfoliosContent.vue'
-import StrategiesContent from './contents/StrategiesContent.vue'
+import StrategyGroupsContent from './contents/StrategyGroupsContent.vue'
 import AIAdvisorContent from './contents/AIAdvisorContent.vue'
 
 const router = useRouter()

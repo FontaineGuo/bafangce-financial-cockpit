@@ -40,8 +40,8 @@ def init_db():
         CacheMetadata,
         Portfolio,
         PortfolioAsset,
-        Strategy,
-        StrategyCondition,
+        StrategyGroup,
+        StrategyCategoryAllocation,
         AssetCategoryMapping,
         AISuggestion,
     )

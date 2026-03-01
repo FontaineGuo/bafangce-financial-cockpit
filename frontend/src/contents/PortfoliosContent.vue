@@ -131,8 +131,11 @@
           <el-table :data="currentPortfolio.assets" stripe v-if="currentPortfolio.assets && currentPortfolio.assets.length > 0">
             <el-table-column prop="asset_code" label="资产代码" width="120" />
             <el-table-column prop="asset_name" label="资产名称" width="150" />
-            <el-table-column prop="target_weight" label="目标权重(%)" width="120" />
-            <el-table-column prop="current_weight" label="当前权重(%)" width="120" />
+            <el-table-column prop="current_weight" label="当前权重(%)" width="120">
+              <template #default="{ row }">
+                {{ (row.current_weight || 0).toFixed(2) }}%
+              </template>
+            </el-table-column>
             <el-table-column prop="allocation_amount" label="分配金额" width="150">
               <template #default="{ row }">
                 ¥{{ formatNumber(row.allocation_amount) }}
@@ -216,15 +219,6 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="目标权重(%)" prop="target_weight">
-          <el-input-number
-            v-model="assetForm.target_weight"
-            :min="0"
-            :max="100"
-            :precision="2"
-            style="width: 100%"
-          />
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="closeAddAssetDialog">取消</el-button>
@@ -254,16 +248,6 @@
         filter-placeholder="搜索资产"
       />
       <el-form :model="batchForm" :rules="batchRules" ref="batchFormRef" label-width="120px" style="margin-top: 20px">
-        <el-form-item label="默认权重(%)" prop="default_weight">
-          <el-input-number
-            v-model="batchForm.default_weight"
-            :min="0"
-            :max="100"
-            :precision="2"
-            style="width: 100%"
-          />
-          <div class="form-tip">所有选中资产将使用相同的目标权重，添加后可单独调整</div>
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="closeBatchAddAssetDialog">取消</el-button>
@@ -309,28 +293,16 @@ const rules = {
 }
 
 const assetForm = reactive({
-  asset_id: undefined as number | undefined,
-  target_weight: 0
+  asset_id: undefined as number | undefined
 })
 
 const assetRules = {
-  asset_id: [{ required: true, message: '请选择资产', trigger: 'change' }],
-  target_weight: [
-    { required: true, message: '请输入目标权重', trigger: 'blur' },
-    { type: 'number', min: 0, max: 100, message: '权重必须在0-100之间', trigger: 'blur' }
-  ]
+  asset_id: [{ required: true, message: '请选择资产', trigger: 'change' }]
 }
 
-const batchForm = reactive({
-  default_weight: 0
-})
+const batchForm = reactive({})
 
-const batchRules = {
-  default_weight: [
-    { required: true, message: '请输入默认权重', trigger: 'blur' },
-    { type: 'number', min: 0, max: 100, message: '权重必须在0-100之间', trigger: 'blur' }
-  ]
-}
+const batchRules = {}
 
 const batchSelectedAssets = ref<number[]>([])
 
@@ -360,11 +332,9 @@ function resetForm() {
 
 function resetAssetForm() {
   assetForm.asset_id = undefined
-  assetForm.target_weight = 0
 }
 
 function resetBatchForm() {
-  batchForm.default_weight = 0
   batchSelectedAssets.value = []
 }
 
@@ -454,8 +424,7 @@ async function handleAddAsset() {
   await assetFormRef.value.validate(async (valid: boolean) => {
     if (valid) {
       const assetData: PortfolioAssetCreate = {
-        asset_id: assetForm.asset_id!,
-        target_weight: assetForm.target_weight
+        asset_id: assetForm.asset_id!
       }
 
       const result = await portfoliosStore.addAssetToPortfolio(currentPortfolio.value!.id, assetData)
@@ -486,8 +455,7 @@ async function handleBatchAddAssets() {
       }
 
       const assetList: PortfolioAssetCreate[] = batchSelectedAssets.value.map(assetId => ({
-        asset_id: assetId,
-        target_weight: batchForm.default_weight
+        asset_id: assetId
       }))
 
       const result = await portfoliosStore.batchAddAssetsToPortfolio(currentPortfolio.value!.id, assetList)

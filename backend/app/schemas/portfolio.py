@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 class PortfolioAssetBase(BaseModel):
     """组合资产基础信息"""
-    target_weight: float = Field(..., ge=0, le=100)
+    pass
 
 
 class PortfolioAssetCreate(PortfolioAssetBase):

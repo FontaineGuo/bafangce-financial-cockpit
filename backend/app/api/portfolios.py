@@ -31,8 +31,10 @@ def _calculate_portfolio_stats(db: Session, portfolio_id: int) -> None:
         PortfolioAsset.portfolio_id == portfolio_id
     ).all()
 
+    # 先计算所有资产的总市值和总成本
     total_value = 0
     total_cost = 0
+    asset_market_values = {}  # 临时存储每项资产的市值
 
     for pa in portfolio_assets:
         asset = db.query(Asset).filter(Asset.id == pa.asset_id).first()
@@ -43,9 +45,13 @@ def _calculate_portfolio_stats(db: Session, portfolio_id: int) -> None:
             total_value += market_value
             total_cost += cost
 
-            # 更新权重
-            pa.current_weight = (market_value / total_value * 100) if total_value > 0 else 0
-            pa.allocation_amount = market_value
+            # 临时存储市值，供后续计算权重使用
+            asset_market_values[pa.asset_id] = market_value
+
+    # 更新权重（使用最终的总市值计算）
+    for pa in portfolio_assets:
+        if pa.id in asset_market_values:
+            pa.current_weight = (asset_market_values[pa.id] / total_value * 100) if total_value > 0 else 0
 
     # 更新组合统计
     total_profit = total_value - total_cost
@@ -79,7 +85,6 @@ def _portfolio_asset_to_response(pa: PortfolioAsset, asset: Optional[Asset] = No
         id=pa.id,
         portfolio_id=pa.portfolio_id,
         asset_id=pa.asset_id,
-        target_weight=pa.target_weight,
         current_weight=pa.current_weight,
         allocation_amount=pa.allocation_amount,
         created_at=pa.created_at,
@@ -212,7 +217,6 @@ async def create_portfolio(
             portfolio_asset = PortfolioAsset(
                 portfolio_id=db_portfolio.id,
                 asset_id=asset_data.asset_id,
-                target_weight=asset_data.target_weight,
             )
             db.add(portfolio_asset)
 
@@ -371,7 +375,6 @@ async def add_asset_to_portfolio(
     portfolio_asset = PortfolioAsset(
         portfolio_id=portfolio_id,
         asset_id=asset_data.asset_id,
-        target_weight=asset_data.target_weight,
     )
     db.add(portfolio_asset)
     db.commit()
@@ -467,7 +470,6 @@ async def batch_add_assets_to_portfolio(
         portfolio_asset = PortfolioAsset(
             portfolio_id=portfolio_id,
             asset_id=asset_data.asset_id,
-            target_weight=asset_data.target_weight,
         )
         db.add(portfolio_asset)
         added_count += 1

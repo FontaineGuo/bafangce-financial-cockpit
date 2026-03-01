@@ -5,7 +5,7 @@ from .enums import AssetType, StrategyCategory
 from .asset import Asset, MarketData, CacheMetadata
 from .user import User
 from .portfolio import Portfolio, PortfolioAsset
-from .strategy import Strategy, StrategyCondition
+from .strategy import StrategyGroup, StrategyCategoryAllocation
 from .asset_category_mapping import AssetCategoryMapping
 from .ai_suggestion import AISuggestion
 
@@ -18,8 +18,8 @@ __all__ = [
     "User",
     "Portfolio",
     "PortfolioAsset",
-    "Strategy",
-    "StrategyCondition",
+    "StrategyGroup",
+    "StrategyCategoryAllocation",
     "AssetCategoryMapping",
     "AISuggestion",
 ]

@@ -2,50 +2,34 @@
   <div class="dashboard-content">
     <h2>仪表盘</h2>
     <el-row :gutter="20">
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card class="stat-card">
           <div class="stat-value">{{ totalAssets }}</div>
           <div class="stat-label">总资产</div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card class="stat-card">
           <div class="stat-value positive">{{ totalProfit }}</div>
           <div class="stat-label">总收益</div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card class="stat-card">
           <div class="stat-value">{{ assetCount }}</div>
           <div class="stat-label">持仓数量</div>
         </el-card>
       </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-value">{{ strategyCount }}</div>
-          <div class="stat-label">启用策略</div>
-        </el-card>
-      </el-col>
     </el-row>
 
     <el-row :gutter="20" style="margin-top: 20px">
-      <el-col :span="12">
+      <el-col :span="24">
         <el-card>
           <template #header>
             <span>资产分布</span>
           </template>
           <div class="chart-placeholder">
             资产分布图表（待实现）
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="12">
-        <el-card>
-          <template #header>
-            <span>策略分布</span>
-          </template>
-          <div class="chart-placeholder">
-            策略分布图表（待实现）
           </div>
         </el-card>
       </el-col>
@@ -57,11 +41,9 @@
 import { computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
 import { useAssetsStore } from '@/store/assets'
-import { useStrategiesStore } from '@/store/strategies'
 
 const userStore = useUserStore()
 const assetsStore = useAssetsStore()
-const strategiesStore = useStrategiesStore()
 
 const totalAssets = computed(() => {
   return assetsStore.assets
@@ -76,8 +58,6 @@ const totalProfit = computed(() => {
 })
 
 const assetCount = computed(() => assetsStore.assets.length)
-
-const strategyCount = computed(() => strategiesStore.strategies.length)
 
 onMounted(async () => {
   await assetsStore.fetchAssets()

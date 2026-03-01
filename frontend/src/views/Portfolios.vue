@@ -146,7 +146,6 @@
           <h4>组合资产 ({{ currentPortfolio.assets.length }})</h4>
           <el-table :data="currentPortfolio.assets" stripe>
             <el-table-column prop="asset_id" label="资产ID" width="80" />
-            <el-table-column prop="target_weight" label="目标权重(%)" width="120" />
             <el-table-column prop="current_weight" label="当前权重(%)" width="120" />
             <el-table-column prop="allocation_amount" label="分配金额" width="150">
               <template #default="{ row }">

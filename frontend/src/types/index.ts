@@ -140,7 +140,6 @@ export interface PortfolioAsset {
   id: number
   portfolio_id: number
   asset_id: number
-  target_weight: number
   current_weight: number
   allocation_amount: number
   asset_code?: string
@@ -176,12 +175,10 @@ export interface PortfolioCreate {
 
 export interface PortfolioAssetCreate {
   asset_id: number
-  target_weight: number
 }
 
 export interface PortfolioAssetBase {
   asset_id: number
-  target_weight: number
 }
 
 export interface PortfolioUpdate {
@@ -211,55 +208,44 @@ export interface BatchAddAssetsResult {
   }>
 }
 
-// ==================== 策略相关类型 ====================
+// ==================== 策略组相关类型 ====================
 
-export interface StrategyCondition {
+export interface StrategyCategoryAllocation {
   id: number
-  strategy_id: number
-  field: string
-  operator: string
-  value: string
-  logical_operator: string
-  order: number
+  strategy_group_id: number
+  category: StrategyCategory
+  percentage: number
+  deviation_threshold?: number
+  created_at: string
+  updated_at: string
 }
 
-export interface StrategyConditionCreate {
-  field: string
-  operator: string
-  value: string
-  logical_operator?: string
-  order?: number
+export interface StrategyCategoryAllocationCreate {
+  category: StrategyCategory
+  percentage: number
+  deviation_threshold?: number
 }
 
-export interface Strategy {
+export interface StrategyGroup {
   id: number
   user_id: number
   name: string
-  type?: string
-  category?: string
   description?: string
-  enabled: boolean
-  last_execution?: string
   created_at: string
   updated_at: string
-  conditions: StrategyCondition[]
+  category_allocations: StrategyCategoryAllocation[]
 }
 
-export interface StrategyCreate {
+export interface StrategyGroupCreate {
   name: string
-  type?: string
-  category?: string
   description?: string
-  enabled?: boolean
-  conditions?: StrategyConditionCreate[]
+  category_allocations: StrategyCategoryAllocationCreate[]
 }
 
-export interface StrategyUpdate {
+export interface StrategyGroupUpdate {
   name?: string
-  type?: string
-  category?: string
   description?: string
-  enabled?: boolean
+  category_allocations?: StrategyCategoryAllocationCreate[]
 }
 
 // ==================== AI建议相关类型 ====================

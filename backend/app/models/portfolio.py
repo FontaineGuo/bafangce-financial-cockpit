@@ -47,7 +47,6 @@ class PortfolioAsset(Base):
     id = Column(Integer, primary_key=True, index=True)
     portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True, comment="组合ID")
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False, index=True, comment="资产ID")
-    target_weight = Column(Float, default=0, comment="目标权重（百分比）")
     current_weight = Column(Float, default=0, comment="当前权重（百分比）")
     allocation_amount = Column(Float, default=0, comment="分配金额")
     created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
