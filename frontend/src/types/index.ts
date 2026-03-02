@@ -162,6 +162,7 @@ export interface Portfolio {
   total_cost: number
   total_profit: number
   total_profit_percent: number
+  strategy_group_id?: number
   assets: PortfolioAsset[]
   created_at: string
   updated_at: string
@@ -184,6 +185,7 @@ export interface PortfolioAssetBase {
 export interface PortfolioUpdate {
   name?: string
   description?: string
+  strategy_group_id?: number
 }
 
 
@@ -285,4 +287,31 @@ export interface StrategyDistribution {
   totalValue: number
   targetWeight: number
   currentWeight: number
+}
+
+export interface StrategyComparisonItem {
+  category: string
+  current_percentage: number
+  target_percentage?: number
+  deviation?: number
+  deviation_threshold?: number
+  status: 'perfect' | 'normal' | 'warning' | 'danger' | 'missing'
+  is_over_threshold: boolean
+}
+
+export interface StrategyComparisonSummary {
+  categories_over_threshold: number
+  categories_missing: number
+  max_deviation: number
+  total_deviation: number
+}
+
+export interface StrategyComparison {
+  current_distribution: StrategyComparisonItem[]
+  applied_strategy_group?: {
+    id: number
+    name: string
+    description?: string
+  }
+  summary: StrategyComparisonSummary
 }

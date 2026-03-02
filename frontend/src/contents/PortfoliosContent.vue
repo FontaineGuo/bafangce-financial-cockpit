@@ -120,6 +120,97 @@
           </el-descriptions>
         </div>
 
+        <!-- 策略组应用 -->
+        <div class="detail-section">
+          <div class="section-header">
+            <h4>策略组配置</h4>
+          </div>
+          <div class="strategy-group-selector">
+            <el-select
+              v-model="selectedStrategyGroupId"
+              placeholder="选择策略组"
+              clearable
+              @change="handleStrategyGroupChange"
+              style="width: 300px"
+            >
+              <el-option
+                v-for="group in strategyGroups"
+                :key="group.id"
+                :label="group.name"
+                :value="group.id"
+              />
+            </el-select>
+            <el-button
+              v-if="currentPortfolio.strategy_group_id"
+              type="danger"
+              size="small"
+              @click="handleRemoveStrategyGroup"
+            >
+              移除策略组
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 策略分布对比 -->
+        <div class="detail-section" v-if="strategyComparison">
+          <div class="section-header">
+            <h4>策略分布对比</h4>
+            <div v-if="strategyComparison.summary.categories_over_threshold > 0" class="warning-badge">
+              <el-tag type="warning" size="small">
+                ⚠️ {{ strategyComparison.summary.categories_over_threshold }} 个分类超出阈值
+              </el-tag>
+            </div>
+          </div>
+          <div class="strategy-comparison-table">
+            <el-table :data="strategyComparison.current_distribution" stripe>
+              <el-table-column prop="category" label="策略分类" width="150">
+                <template #default="{ row }">
+                  {{ formatStrategyCategoryName(row.category) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="current_percentage" label="当前分布" width="120">
+                <template #default="{ row }">
+                  {{ row.current_percentage.toFixed(2) }}%
+                </template>
+              </el-table-column>
+              <el-table-column prop="target_percentage" label="目标分布" width="120">
+                <template #default="{ row }">
+                  {{ row.target_percentage ? row.target_percentage.toFixed(2) + '%' : '-' }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="deviation" label="偏离值" width="120">
+                <template #default="{ row }">
+                  <span
+                    v-if="row.deviation !== null && row.deviation !== undefined"
+                    :class="{
+                      'positive-deviation': row.deviation > 0,
+                      'negative-deviation': row.deviation < 0
+                    }"
+                  >
+                    {{ row.deviation > 0 ? '+' : '' }}{{ row.deviation.toFixed(2) }}%
+                  </span>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="150">
+                <template #default="{ row }">
+                  <el-tag
+                    :type="getStatusTagType(row.status)"
+                    size="small"
+                  >
+                    {{ getStatusText(row.status) }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="deviation_threshold" label="偏离阈值" width="120">
+                <template #default="{ row }">
+                  {{ row.deviation_threshold ? row.deviation_threshold + '%' : '-' }}
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+
         <!-- 资产操作 -->
         <div class="detail-section">
           <div class="section-header">
@@ -266,11 +357,13 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { usePortfoliosStore } from '@/store/portfolios'
 import { useAssetsStore } from '@/store/assets'
+import { useStrategyGroupsStore } from '@/store/strategy-groups'
 import { STRATEGY_CATEGORY_NAMES } from '@/utils/constants'
 import type { Portfolio, PortfolioCreate, PortfolioUpdate, PortfolioAssetCreate } from '@/types'
 
 const portfoliosStore = usePortfoliosStore()
 const assetsStore = useAssetsStore()
+const strategyGroupsStore = useStrategyGroupsStore()
 
 const showCreateDialog = ref(false)
 const showDetailDialog = ref(false)
@@ -309,6 +402,11 @@ const batchForm = reactive({})
 const batchRules = {}
 
 const batchSelectedAssets = ref<number[]>([])
+
+// 策略组相关
+const selectedStrategyGroupId = ref<number | undefined>(undefined)
+const strategyGroups = computed(() => strategyGroupsStore.strategyGroups)
+const strategyComparison = ref<any>(null)
 
 // 可用资产：未在当前组合中的资产
 const availableAssets = computed(() => {
@@ -414,6 +512,14 @@ async function handleViewPortfolio(portfolio: Portfolio) {
   currentPortfolio.value = await portfoliosStore.fetchPortfolio(portfolio.id)
   if (currentPortfolio.value) {
     strategyDistribution.value = await portfoliosStore.fetchPortfolioStrategyDistribution(portfolio.id)
+    // 设置选中的策略组
+    if (currentPortfolio.value.strategy_group_id) {
+      selectedStrategyGroupId.value = currentPortfolio.value.strategy_group_id
+    } else {
+      selectedStrategyGroupId.value = undefined
+    }
+    // 加载策略对比数据
+    await loadStrategyComparison()
     showDetailDialog.value = true
   }
 }
@@ -521,9 +627,83 @@ function formatStrategyCategoryName(category: string): string {
   return STRATEGY_CATEGORY_NAMES[category as keyof typeof STRATEGY_CATEGORY_NAMES] || category
 }
 
+async function loadStrategyComparison() {
+  if (!currentPortfolio.value) return
+  strategyComparison.value = await portfoliosStore.getStrategyComparison(currentPortfolio.value.id)
+}
+
+async function handleStrategyGroupChange(strategyGroupId: number) {
+  if (!currentPortfolio.value) return
+  const result = await portfoliosStore.applyStrategyGroupToPortfolio(currentPortfolio.value.id, strategyGroupId)
+  if (result.success) {
+    ElMessage.success('策略组应用成功')
+    await loadStrategyComparison()
+  } else {
+    ElMessage.error(result.error || '应用策略组失败')
+    // 恢复选择
+    selectedStrategyGroupId.value = currentPortfolio.value.strategy_group_id
+  }
+}
+
+async function handleRemoveStrategyGroup() {
+  if (!currentPortfolio.value) return
+  try {
+    await ElMessageBox.confirm('确定要移除当前策略组吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    const result = await portfoliosStore.removeStrategyGroupFromPortfolio(currentPortfolio.value.id)
+    if (result.success) {
+      ElMessage.success('策略组已移除')
+      selectedStrategyGroupId.value = undefined
+      await loadStrategyComparison()
+    } else {
+      ElMessage.error(result.error || '移除失败')
+    }
+  } catch (error) {
+    // 用户取消移除
+  }
+}
+
+function getStatusTagType(status: string): 'success' | 'warning' | 'danger' | 'info' {
+  switch (status) {
+    case 'perfect':
+      return 'success'
+    case 'normal':
+      return 'success'
+    case 'warning':
+      return 'warning'
+    case 'danger':
+      return 'danger'
+    case 'missing':
+      return 'info'
+    default:
+      return 'info'
+  }
+}
+
+function getStatusText(status: string): string {
+  switch (status) {
+    case 'perfect':
+      return '完美匹配'
+    case 'normal':
+      return '正常'
+    case 'warning':
+      return '轻微偏离'
+    case 'danger':
+      return '严重偏离'
+    case 'missing':
+      return '待配置'
+    default:
+      return '-'
+  }
+}
+
 onMounted(async () => {
   await portfoliosStore.fetchPortfolios()
   await assetsStore.fetchAssets()
+  await strategyGroupsStore.fetchStrategyGroups()
 })
 </script>
 
@@ -698,4 +878,31 @@ onMounted(async () => {
   color: #909399;
   margin-top: 4px;
 }
+
+/* 策略组相关样式 */
+.strategy-group-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.warning-badge {
+  margin-left: auto;
+}
+
+.strategy-comparison-table {
+  margin-top: 15px;
+}
+
+.positive-deviation {
+  color: #f56c6c;
+  font-weight: 500;
+}
+
+.negative-deviation {
+  color: #67c23a;
+  font-weight: 500;
+}
+
 </style>

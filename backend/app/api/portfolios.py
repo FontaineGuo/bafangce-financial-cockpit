@@ -2,13 +2,14 @@
 投资组合API路由
 """
 from typing import List, Dict
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
 from ..models.user import User
 from ..models.portfolio import Portfolio, PortfolioAsset
 from ..models.asset import Asset
+from ..models.strategy import StrategyGroup, StrategyCategoryAllocation
 from ..models.enums import StrategyCategory
 from ..schemas.portfolio import (
     Portfolio as PortfolioSchema,
@@ -17,6 +18,9 @@ from ..schemas.portfolio import (
     PortfolioAssetCreate,
     PortfolioAssetResponse,
     StrategyDistributionItem,
+    StrategyComparisonItem,
+    StrategyComparisonSummary,
+    StrategyComparison,
 )
 from ..schemas.common import Response
 from ..utils.auth import get_current_active_user
@@ -120,6 +124,7 @@ async def get_portfolios(
             "total_cost": portfolio.total_cost,
             "total_profit": portfolio.total_profit,
             "total_profit_percent": portfolio.total_profit_percent,
+            "strategy_group_id": portfolio.strategy_group_id,
             "assets": assets_data,
             "created_at": portfolio.created_at,
             "updated_at": portfolio.updated_at,
@@ -162,6 +167,7 @@ async def get_portfolio(
         "total_cost": portfolio.total_cost,
         "total_profit": portfolio.total_profit,
         "total_profit_percent": portfolio.total_profit_percent,
+        "strategy_group_id": portfolio.strategy_group_id,
         "assets": assets_data,
         "created_at": portfolio.created_at,
         "updated_at": portfolio.updated_at,
@@ -239,6 +245,7 @@ async def create_portfolio(
         "total_cost": db_portfolio.total_cost,
         "total_profit": db_portfolio.total_profit,
         "total_profit_percent": db_portfolio.total_profit_percent,
+        "strategy_group_id": db_portfolio.strategy_group_id,
         "assets": assets_data,
         "created_at": db_portfolio.created_at,
         "updated_at": db_portfolio.updated_at,
@@ -287,6 +294,7 @@ async def update_portfolio(
         "total_cost": db_portfolio.total_cost,
         "total_profit": db_portfolio.total_profit,
         "total_profit_percent": db_portfolio.total_profit_percent,
+        "strategy_group_id": db_portfolio.strategy_group_id,
         "assets": assets_data,
         "created_at": db_portfolio.created_at,
         "updated_at": db_portfolio.updated_at,
@@ -403,6 +411,7 @@ async def add_asset_to_portfolio(
         "total_cost": db_portfolio.total_cost,
         "total_profit": db_portfolio.total_profit,
         "total_profit_percent": db_portfolio.total_profit_percent,
+        "strategy_group_id": db_portfolio.strategy_group_id,
         "assets": assets_data,
         "created_at": db_portfolio.created_at,
         "updated_at": db_portfolio.updated_at,
@@ -595,3 +604,248 @@ async def get_portfolio_strategy_distribution(
         })
 
     return Response.success_response(data=result)
+
+
+@router.post("/{portfolio_id}/strategy-group", response_model=Response[PortfolioSchema])
+async def apply_strategy_group_to_portfolio(
+    portfolio_id: int,
+    strategy_group_id: int = Body(..., embed=True),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """应用策略组到投资组合"""
+    # 验证投资组合
+    db_portfolio = db.query(Portfolio).filter(
+        Portfolio.id == portfolio_id,
+        Portfolio.user_id == current_user.id
+    ).first()
+
+    if not db_portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="投资组合不存在"
+        )
+
+    # 验证策略组存在且属于当前用户
+    db_strategy_group = db.query(StrategyGroup).filter(
+        StrategyGroup.id == strategy_group_id,
+        StrategyGroup.user_id == current_user.id
+    ).first()
+
+    if not db_strategy_group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="策略组不存在"
+        )
+
+    # 应用策略组
+    db_portfolio.strategy_group_id = strategy_group_id
+    db.commit()
+    db.refresh(db_portfolio)
+
+    # 转换资产为响应格式
+    assets_data = []
+    for pa in db_portfolio.assets:
+        asset = db.query(Asset).filter(Asset.id == pa.asset_id).first()
+        assets_data.append(_portfolio_asset_to_response(pa, asset))
+
+    portfolio_dict = {
+        "id": db_portfolio.id,
+        "user_id": db_portfolio.user_id,
+        "name": db_portfolio.name,
+        "description": db_portfolio.description,
+        "total_value": db_portfolio.total_value,
+        "total_cost": db_portfolio.total_cost,
+        "total_profit": db_portfolio.total_profit,
+        "total_profit_percent": db_portfolio.total_profit_percent,
+        "strategy_group_id": db_portfolio.strategy_group_id,
+        "assets": assets_data,
+        "created_at": db_portfolio.created_at,
+        "updated_at": db_portfolio.updated_at,
+    }
+
+    return Response.success_response(data=PortfolioSchema(**portfolio_dict))
+
+
+@router.delete("/{portfolio_id}/strategy-group", response_model=Response[PortfolioSchema])
+async def remove_strategy_group_from_portfolio(
+    portfolio_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """移除投资组合的策略组"""
+    # 验证投资组合
+    db_portfolio = db.query(Portfolio).filter(
+        Portfolio.id == portfolio_id,
+        Portfolio.user_id == current_user.id
+    ).first()
+
+    if not db_portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="投资组合不存在"
+        )
+
+    # 移除策略组
+    db_portfolio.strategy_group_id = None
+    db.commit()
+    db.refresh(db_portfolio)
+
+    # 转换资产为响应格式
+    assets_data = []
+    for pa in db_portfolio.assets:
+        asset = db.query(Asset).filter(Asset.id == pa.asset_id).first()
+        assets_data.append(_portfolio_asset_to_response(pa, asset))
+
+    portfolio_dict = {
+        "id": db_portfolio.id,
+        "user_id": db_portfolio.user_id,
+        "name": db_portfolio.name,
+        "description": db_portfolio.description,
+        "total_value": db_portfolio.total_value,
+        "total_cost": db_portfolio.total_cost,
+        "total_profit": db_portfolio.total_profit,
+        "total_profit_percent": db_portfolio.total_profit_percent,
+        "strategy_group_id": db_portfolio.strategy_group_id,
+        "assets": assets_data,
+        "created_at": db_portfolio.created_at,
+        "updated_at": db_portfolio.updated_at,
+    }
+
+    return Response.success_response(data=PortfolioSchema(**portfolio_dict))
+
+
+@router.get("/{portfolio_id}/strategy-comparison", response_model=Response[StrategyComparison])
+async def get_strategy_comparison(
+    portfolio_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """获取策略分布对比"""
+    # 验证投资组合
+    db_portfolio = db.query(Portfolio).filter(
+        Portfolio.id == portfolio_id,
+        Portfolio.user_id == current_user.id
+    ).first()
+
+    if not db_portfolio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="投资组合不存在"
+        )
+
+    # 如果没有策略组，返回空对比
+    if not db_portfolio.strategy_group_id:
+        return Response.success_response(data={
+            "current_distribution": [],
+            "summary": StrategyDistributionSummary(
+                categories_over_threshold=0,
+                categories_missing=0,
+                max_deviation=0.0,
+                total_deviation=0.0
+            )
+        })
+
+    # 获取策略组及其分配
+    strategy_group = db.query(StrategyGroup).filter(
+        StrategyGroup.id == db_portfolio.strategy_group_id
+    ).first()
+
+    if not strategy_group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="策略组不存在"
+        )
+
+    # 获取策略组的所有分类分配
+    target_allocations = db.query(StrategyCategoryAllocation).filter(
+        StrategyCategoryAllocation.strategy_group_id == strategy_group.id
+    ).all()
+
+    # 获取当前投资组合的资产分布
+    portfolio_assets = db.query(PortfolioAsset).filter(
+        PortfolioAsset.portfolio_id == portfolio_id
+    ).all()
+
+    # 计算当前分布
+    current_distribution = {}
+    total_value = 0
+
+    for pa in portfolio_assets:
+        asset = db.query(Asset).filter(Asset.id == pa.asset_id).first()
+        if asset:
+            category = asset.strategy_category or StrategyCategory.OTHER.value
+            value = asset.market_value or (asset.quantity * asset.cost_price)
+
+            if category not in current_distribution:
+                current_distribution[category] = 0.0
+            current_distribution[category] += value
+            total_value += value
+
+    # 计算当前百分比
+    current_percentages = {}
+    for category, value in current_distribution.items():
+        current_percentages[category] = (value / total_value * 100) if total_value > 0 else 0
+
+    # 构建对比结果
+    comparison_items = []
+    summary = StrategyDistributionSummary(
+        categories_over_threshold=0,
+        categories_missing=0,
+        max_deviation=0.0,
+        total_deviation=0.0
+    )
+
+    # 处理目标分类
+    for allocation in target_allocations:
+        category = allocation.category
+        target_percentage = float(allocation.percentage)
+        current_percentage = current_percentages.get(category, 0.0)
+        deviation = abs(current_percentage - target_percentage)
+        deviation_threshold = float(allocation.deviation_threshold)
+
+        # 确定状态
+        if deviation == 0:
+            status = "perfect"
+        elif deviation <= deviation_threshold:
+            status = "normal"
+        elif deviation <= deviation_threshold * 2:
+            status = "warning"
+        else:
+            status = "danger"
+
+        # 更新摘要
+        if status in ["warning", "danger"]:
+            summary.categories_over_threshold += 1
+        if deviation > summary.max_deviation:
+            summary.max_deviation = deviation
+        summary.total_deviation += deviation
+
+        comparison_items.append(StrategyComparisonItem(
+            category=category,
+            current_percentage=current_percentage,
+            target_percentage=target_percentage,
+            deviation=deviation,
+            deviation_threshold=deviation_threshold,
+            status=status,
+            is_over_threshold=status in ["warning", "danger"]
+        ))
+
+    # 处理缺失的分类（投资组合中有资产但策略组中没有对应分类）
+    for category in current_distribution:
+        if category not in [alloc.category for alloc in target_allocations]:
+            comparison_items.append(StrategyComparisonItem(
+                category=category,
+                current_percentage=current_percentages[category],
+                target_percentage=None,
+                deviation=None,
+                deviation_threshold=None,
+                status="missing",
+                is_over_threshold=False
+            ))
+            summary.categories_missing += 1
+
+    return Response.success_response(data={
+        "current_distribution": comparison_items,
+        "summary": summary
+    })

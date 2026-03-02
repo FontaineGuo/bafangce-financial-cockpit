@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Portfolio, PortfolioCreate, PortfolioUpdate, PortfolioAssetBase, PortfolioAssetCreate, BatchAddAssetsResult } from '@/types'
+import type { Portfolio, PortfolioCreate, PortfolioUpdate, PortfolioAssetBase, PortfolioAssetCreate, BatchAddAssetsResult, StrategyComparison } from '@/types'
 import { portfoliosApi } from '@/api/portfolios'
 
 export const usePortfoliosStore = defineStore('portfolios', () => {
@@ -143,6 +143,52 @@ export const usePortfoliosStore = defineStore('portfolios', () => {
     }
   }
 
+  async function applyStrategyGroupToPortfolio(portfolioId: number, strategyGroupId: number) {
+    try {
+      const response = await portfoliosApi.applyStrategyGroupToPortfolio(portfolioId, strategyGroupId)
+      const index = portfolios.value.findIndex(p => p.id === portfolioId)
+      if (index !== -1) {
+        portfolios.value[index] = response.data.data!
+      }
+      if (currentPortfolio.value?.id === portfolioId) {
+        currentPortfolio.value = response.data.data!
+      }
+      return { success: true }
+    } catch (err: any) {
+      console.error('Apply strategy group to portfolio failed:', err)
+      const errorMessage = err.response?.data?.detail || '应用策略组失败'
+      return { success: false, error: errorMessage }
+    }
+  }
+
+  async function removeStrategyGroupFromPortfolio(portfolioId: number) {
+    try {
+      await portfoliosApi.removeStrategyGroupFromPortfolio(portfolioId)
+      const index = portfolios.value.findIndex(p => p.id === portfolioId)
+      if (index !== -1) {
+        portfolios.value[index].strategy_group_id = undefined
+      }
+      if (currentPortfolio.value?.id === portfolioId) {
+        currentPortfolio.value.strategy_group_id = undefined
+      }
+      return { success: true }
+    } catch (err: any) {
+      console.error('Remove strategy group from portfolio failed:', err)
+      const errorMessage = err.response?.data?.detail || '移除策略组失败'
+      return { success: false, error: errorMessage }
+    }
+  }
+
+  async function getStrategyComparison(portfolioId: number) {
+    try {
+      const response = await portfoliosApi.getStrategyComparison(portfolioId)
+      return response.data.data || null
+    } catch (err) {
+      console.error('Get strategy comparison failed:', err)
+      return null
+    }
+  }
+
   function selectPortfolio(portfolio: Portfolio) {
     currentPortfolio.value = portfolio
   }
@@ -169,6 +215,9 @@ export const usePortfoliosStore = defineStore('portfolios', () => {
     batchAddAssetsToPortfolio,
     removeAssetFromPortfolio,
     fetchPortfolioStrategyDistribution,
+    applyStrategyGroupToPortfolio,
+    removeStrategyGroupFromPortfolio,
+    getStrategyComparison,
     selectPortfolio,
     clearCurrentPortfolio,
     refreshPortfolios

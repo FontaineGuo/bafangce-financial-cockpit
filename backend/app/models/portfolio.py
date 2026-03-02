@@ -25,12 +25,14 @@ class Portfolio(Base):
     total_cost = Column(Float, default=0, comment="总成本")
     total_profit = Column(Float, default=0, comment="总盈亏")
     total_profit_percent = Column(Float, default=0, comment="总盈亏百分比")
+    strategy_group_id = Column(Integer, ForeignKey("strategy_groups.id"), nullable=True, index=True, comment="应用的策略组ID")
     created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
 
     # 关系
     user = relationship("User", back_populates="portfolios")
     assets = relationship("PortfolioAsset", back_populates="portfolio", cascade="all, delete-orphan")
+    strategy_group = relationship("StrategyGroup", backref="portfolios")
 
     def __repr__(self):
         return f"<Portfolio {self.name}>"
