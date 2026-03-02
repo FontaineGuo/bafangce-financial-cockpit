@@ -70,6 +70,7 @@
       v-model="showCreateDialog"
       :title="editingPortfolio ? '编辑组合' : '创建组合'"
       width="600px"
+      destroy-on-close
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
         <el-form-item label="组合名称" prop="name">
@@ -95,6 +96,7 @@
       v-model="showDetailDialog"
       :title="`${currentPortfolio?.name} - 详情`"
       width="1000px"
+      destroy-on-close
     >
       <div v-if="currentPortfolio" class="portfolio-detail">
         <!-- 基本信息 -->
@@ -202,6 +204,7 @@
       v-model="showAddAssetDialog"
       title="添加资产到组合"
       width="600px"
+      destroy-on-close
     >
       <el-form :model="assetForm" :rules="assetRules" ref="assetFormRef" label-width="120px">
         <el-form-item label="选择资产" prop="asset_id">
@@ -231,6 +234,7 @@
       v-model="showBatchAddAssetDialog"
       title="批量添加资产到组合"
       width="800px"
+      destroy-on-close
     >
       <div class="batch-add-header">
         <el-alert

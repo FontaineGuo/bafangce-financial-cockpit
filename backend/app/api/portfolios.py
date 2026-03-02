@@ -50,8 +50,8 @@ def _calculate_portfolio_stats(db: Session, portfolio_id: int) -> None:
 
     # 更新权重（使用最终的总市值计算）
     for pa in portfolio_assets:
-        if pa.id in asset_market_values:
-            pa.current_weight = (asset_market_values[pa.id] / total_value * 100) if total_value > 0 else 0
+        if pa.asset_id in asset_market_values:
+            pa.current_weight = (asset_market_values[pa.asset_id] / total_value * 100) if total_value > 0 else 0
 
     # 更新组合统计
     total_profit = total_value - total_cost
@@ -381,7 +381,12 @@ async def add_asset_to_portfolio(
 
     # 计算组合统计
     _calculate_portfolio_stats(db, portfolio_id)
-    db.refresh(db_portfolio)
+
+    # 重新查询组合以获取最新的资产关系
+    db_portfolio = db.query(Portfolio).filter(
+        Portfolio.id == portfolio_id,
+        Portfolio.user_id == current_user.id
+    ).first()
 
     # 转换资产为响应格式
     assets_data = []
