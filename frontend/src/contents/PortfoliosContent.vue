@@ -221,20 +221,20 @@
             </div>
           </div>
 
-          <el-table :data="currentPortfolio.assets" stripe v-if="currentPortfolio.assets && currentPortfolio.assets.length > 0">
-            <el-table-column prop="asset_code" label="资产代码" width="120" />
-            <el-table-column prop="asset_name" label="资产名称" width="150" />
-            <el-table-column prop="current_weight" label="当前权重(%)" width="120">
+          <el-table :data="sortedAssets" stripe v-if="currentPortfolio.assets && currentPortfolio.assets.length > 0" @sort-change="handleAssetSortChange">
+            <el-table-column prop="asset_code" label="资产代码" width="120" sortable="custom" />
+            <el-table-column prop="asset_name" label="资产名称" width="150" sortable="custom" />
+            <el-table-column prop="current_weight" label="当前权重(%)" width="120" sortable="custom">
               <template #default="{ row }">
                 {{ (row.current_weight || 0).toFixed(2) }}%
               </template>
             </el-table-column>
-            <el-table-column prop="allocation_amount" label="分配金额" width="150">
+            <el-table-column prop="allocation_amount" label="分配金额" width="150" sortable="custom">
               <template #default="{ row }">
                 ¥{{ formatNumber(row.allocation_amount) }}
               </template>
             </el-table-column>
-            <el-table-column label="盈亏" width="120">
+            <el-table-column prop="profit" label="盈亏" width="120" sortable="custom">
               <template #default="{ row }">
                 <span v-if="row.asset_profit !== undefined" :class="{ positive: row.asset_profit > 0, negative: row.asset_profit < 0 }">
                   ¥{{ formatNumber(row.asset_profit) }}
@@ -242,7 +242,7 @@
                 <span v-else>-</span>
               </template>
             </el-table-column>
-            <el-table-column label="收益率" width="100">
+            <el-table-column prop="profit_percent" label="收益率" width="100" sortable="custom">
               <template #default="{ row }">
                 <span v-if="row.asset_profit_percent !== undefined" :class="{ positive: row.asset_profit_percent > 0, negative: row.asset_profit_percent < 0 }">
                   {{ row.asset_profit_percent?.toFixed(2) || 0 }}%
@@ -250,7 +250,7 @@
                 <span v-else>-</span>
               </template>
             </el-table-column>
-            <el-table-column label="策略分类" width="120">
+            <el-table-column prop="strategy_category" label="策略分类" width="120" sortable="custom">
               <template #default="{ row }">
                 <span>{{ formatStrategyCategoryName(row.strategy_category || 'OTHER') }}</span>
               </template>
@@ -408,6 +408,10 @@ const selectedStrategyGroupId = ref<number | undefined>(undefined)
 const strategyGroups = computed(() => strategyGroupsStore.strategyGroups)
 const strategyComparison = ref<any>(null)
 
+// 资产排序相关
+const assetSortColumn = ref<string | null>(null)
+const assetSortOrder = ref<'ascending' | 'descending' | null>(null)
+
 // 可用资产：未在当前组合中的资产
 const availableAssets = computed(() => {
   if (!currentPortfolio.value) return assets.value
@@ -426,6 +430,72 @@ const availableAssetsForTransfer = computed(() => {
 })
 
 const strategyDistribution = ref<any[]>([])
+
+// 排序后的资产列表
+const sortedAssets = computed(() => {
+  if (!currentPortfolio.value || !currentPortfolio.value.assets) return []
+
+  const assets = [...currentPortfolio.value.assets]
+
+  if (!assetSortColumn.value || !assetSortOrder.value) return assets
+
+  return assets.sort((a, b) => {
+    let valueA: any
+    let valueB: any
+
+    // 根据排序列获取值
+    switch (assetSortColumn.value) {
+      case 'asset_code':
+        valueA = a.asset_code || ''
+        valueB = b.asset_code || ''
+        break
+      case 'asset_name':
+        valueA = a.asset_name || ''
+        valueB = b.asset_name || ''
+        break
+      case 'current_weight':
+        valueA = a.current_weight || 0
+        valueB = b.current_weight || 0
+        break
+      case 'allocation_amount':
+        valueA = a.allocation_amount || 0
+        valueB = b.allocation_amount || 0
+        break
+      case 'profit':
+        valueA = a.asset_profit || 0
+        valueB = b.asset_profit || 0
+        break
+      case 'profit_percent':
+        valueA = a.asset_profit_percent || 0
+        valueB = b.asset_profit_percent || 0
+        break
+      case 'strategy_category':
+        valueA = formatStrategyCategoryName(a.strategy_category || 'OTHER')
+        valueB = formatStrategyCategoryName(b.strategy_category || 'OTHER')
+        break
+      default:
+        return 0
+    }
+
+    // 字符串比较
+    if (typeof valueA === 'string' && typeof valueB === 'string') {
+      return assetSortOrder.value === 'ascending'
+        ? valueA.localeCompare(valueB, 'zh-CN')
+        : valueB.localeCompare(valueA, 'zh-CN')
+    }
+
+    // 数值比较
+    return assetSortOrder.value === 'ascending'
+      ? valueA - valueB
+      : valueB - valueA
+  })
+})
+
+// 处理排序变化
+function handleAssetSortChange({ prop, order }: { prop: string; order: 'ascending' | 'descending' | null }) {
+  assetSortColumn.value = prop
+  assetSortOrder.value = order
+}
 
 function resetForm() {
   form.name = ''

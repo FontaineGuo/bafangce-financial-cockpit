@@ -738,7 +738,7 @@ async def get_strategy_comparison(
     if not db_portfolio.strategy_group_id:
         return Response.success_response(data={
             "current_distribution": [],
-            "summary": StrategyDistributionSummary(
+            "summary": StrategyComparisonSummary(
                 categories_over_threshold=0,
                 categories_missing=0,
                 max_deviation=0.0,
@@ -789,7 +789,7 @@ async def get_strategy_comparison(
 
     # 构建对比结果
     comparison_items = []
-    summary = StrategyDistributionSummary(
+    summary = StrategyComparisonSummary(
         categories_over_threshold=0,
         categories_missing=0,
         max_deviation=0.0,

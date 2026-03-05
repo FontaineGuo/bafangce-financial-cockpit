@@ -120,7 +120,7 @@
         <el-divider>策略分类配置</el-divider>
         <div class="allocations-section">
           <el-alert
-            title="注意：所有策略分类的百分比总和不能超过100%"
+            title="注意：所有策略分类的百分比总和不能超过100%，每个策略分类在一个策略组中只能使用一次"
             type="info"
             :closable="false"
             show-icon
@@ -135,18 +135,39 @@
             <el-form-item
               :label="`分类 ${index + 1}`"
               :prop="`category_allocations.${index}.category`"
-              :rules="[{ required: true, message: '请选择策略分类', trigger: 'change' }]"
+              :rules="[
+                { required: true, message: '请选择策略分类', trigger: 'change' },
+                {
+                  validator: (rule: any, value: string, callback: any) => {
+                    if (!value) {
+                      callback()
+                      return
+                    }
+                    // 检查是否有重复分类
+                    const duplicates = form.category_allocations.filter((a, i) =>
+                      a.category === value && i !== index
+                    )
+                    if (duplicates.length > 0) {
+                      callback(new Error('该策略分类已存在，请选择其他分类'))
+                    } else {
+                      callback()
+                    }
+                  },
+                  trigger: 'change'
+                }
+              ]"
             >
-              <el-select v-model="allocation.category" placeholder="选择策略分类">
-                <el-option label="现金" value="CASH" />
-                <el-option label="国内股票ETF" value="CN_STOCK_ETF" />
-                <el-option label="海外股票ETF" value="OVERSEAS_STOCK_ETF" />
-                <el-option label="商品" value="COMMODITY" />
-                <el-option label="信用债" value="CREDIT_BOND" />
-                <el-option label="长债" value="LONG_BOND" />
-                <el-option label="短债" value="SHORT_BOND" />
-                <el-option label="黄金" value="GOLD" />
-                <el-option label="其他" value="OTHER" />
+              <el-select
+                v-model="allocation.category"
+                placeholder="选择策略分类"
+                @change="(val: string) => handleCategoryChange(index, val)"
+              >
+                <el-option
+                  v-for="category in getAvailableCategories(index)"
+                  :key="category"
+                  :label="getCategoryLabel(category)"
+                  :value="category"
+                />
               </el-select>
             </el-form-item>
             <el-form-item
@@ -336,7 +357,23 @@ function closeDialog() {
 }
 
 function addAllocation() {
-  form.category_allocations.push({ category: StrategyCategory.CASH, percentage: 0, deviation_threshold: undefined })
+  // 检查已使用的分类
+  const usedCategories = new Set(form.category_allocations.map(a => a.category))
+
+  // 查找第一个未使用的分类
+  const availableCategories = Object.values(StrategyCategory).filter(category => !usedCategories.has(category))
+
+  if (availableCategories.length === 0) {
+    ElMessage.warning('所有策略分类都已使用，无法添加更多')
+    return
+  }
+
+  // 添加第一个可用的分类
+  form.category_allocations.push({
+    category: availableCategories[0],
+    percentage: 0,
+    deviation_threshold: undefined
+  })
 }
 
 function removeAllocation(index: number) {
@@ -345,6 +382,32 @@ function removeAllocation(index: number) {
 
 function validateTotalPercentage() {
   // 只是为了触发UI更新，实际验证在rules中
+}
+
+// 获取可用的分类（排除已使用的分类）
+function getAvailableCategories(excludeIndex: number): StrategyCategory[] {
+  const usedCategories = form.category_allocations
+    .map((a, i) => a.category)
+    .filter((_, i) => i !== excludeIndex)
+
+  return Object.values(StrategyCategory).filter(category => !usedCategories.includes(category))
+}
+
+// 处理分类变化时的验证
+function handleCategoryChange(index: number, category: string) {
+  // 检查是否有重复分类
+  const duplicates = form.category_allocations.filter((a, i) =>
+    a.category === category && i !== index
+  )
+
+  if (duplicates.length > 0) {
+    ElMessage.warning('该策略分类已存在，请选择其他分类')
+    // 重置为第一个可用分类
+    const available = getAvailableCategories(index)
+    if (available.length > 0) {
+      form.category_allocations[index].category = available[0]
+    }
+  }
 }
 
 function getCategoryLabel(category: StrategyCategory): string {
@@ -370,6 +433,15 @@ async function handleSubmit() {
       // 验证总百分比不超过100%
       if (formTotalPercentage.value > 100) {
         ElMessage.error('所有策略分类的百分比总和不能超过100%')
+        return
+      }
+
+      // 验证分类唯一性
+      const categories = form.category_allocations.map(a => a.category)
+      const uniqueCategories = new Set(categories)
+      if (categories.length !== uniqueCategories.size) {
+        const duplicates = categories.filter((cat, index) => categories.indexOf(cat) !== index)
+        ElMessage.error(`检测到重复的策略分类：${getCategoryLabel(duplicates[0] as StrategyCategory)}，请确保每个分类只使用一次`)
         return
       }
 

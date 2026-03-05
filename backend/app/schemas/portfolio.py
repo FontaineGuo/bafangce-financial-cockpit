@@ -67,10 +67,8 @@ class StrategyComparisonSummary(BaseModel):
 
 class StrategyComparison(BaseModel):
     """策略分布对比"""
-    current_distribution: list[StrategyComparisonItem]
-    summary: StrategyDistributionSummary
-
-    model_config = ConfigDict(from_attributes=True)
+    current_distribution: list[StrategyComparisonItem] = []
+    summary: StrategyComparisonSummary = StrategyComparisonSummary()
 
 class PortfolioBase(BaseModel):
     """组合基础信息"""
