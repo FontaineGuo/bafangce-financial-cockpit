@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     CACHE_ENABLED: bool = True
     CACHE_DEFAULT_TTL: int = 3600  # 1小时
 
+    # 数据源配置
+    USE_REAL_DATA: bool = True  # True: 使用真实API数据, False: 使用Mock数据
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -1,4 +1,5 @@
 import { AssetType, StrategyCategory } from '@/types'
+import { Refresh } from '@element-plus/icons-vue'
 
 // 策略分类显示名称映射
 export const STRATEGY_CATEGORY_NAMES: Record<string, string> = {
@@ -128,6 +129,7 @@ export function getDefaultStrategyCategory(
 ): StrategyCategory {
   let category = DEFAULT_CATEGORY_MAPPING[assetType] || StrategyCategory.OTHER
 
+  // 对于基金类型，根据基金名称关键字进行二次判断
   if (assetType === AssetType.LOF_FUND && assetName) {
     category = categorizeFundByName(assetName, LOF_KEYWORD_MAPPING, category)
   } else if (assetType === AssetType.ETF_FUND && assetName) {
@@ -162,4 +164,9 @@ export function formatStrategyCategoryName(category: string): string {
 
 export function getStrategyCategoryColor(category: string): string {
   return STRATEGY_CATEGORY_COLORS[category] || '#C0C4CC'
+}
+
+// 导出图标供Vue组件使用
+export const ICONS = {
+  Refresh
 }

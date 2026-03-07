@@ -79,6 +79,41 @@ export const useAssetsStore = defineStore('assets', () => {
     }
   }
 
+  async function refreshAsset(id: number) {
+    try {
+      const response = await assetsApi.refreshAsset(id)
+      const index = assets.value.findIndex(a => a.id === id)
+      if (index !== -1) {
+        assets.value[index] = response.data.data!
+      }
+      return { success: true }
+    } catch (err: any) {
+      console.error('Refresh asset failed:', err)
+      const errorMessage = err.response?.data?.detail || '刷新资产失败'
+      return { success: false, error: errorMessage }
+    }
+  }
+
+  async function batchRefreshAssets() {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await assetsApi.batchRefreshAssets()
+      // 重新获取所有资产
+      await fetchAssets()
+      return {
+        success: true,
+        data: response.data.data
+      }
+    } catch (err: any) {
+      console.error('Batch refresh assets failed:', err)
+      const errorMessage = err.response?.data?.detail || '批量刷新资产失败'
+      error.value = errorMessage
+      loading.value = false
+      return { success: false, error: errorMessage }
+    }
+  }
+
   async function refreshAssets() {
     await fetchAssets()
   }
@@ -92,6 +127,8 @@ export const useAssetsStore = defineStore('assets', () => {
     updateAsset,
     deleteAsset,
     updateAssetStrategyCategory,
+    refreshAsset,
+    batchRefreshAssets,
     refreshAssets
   }
 })

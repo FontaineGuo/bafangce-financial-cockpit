@@ -37,5 +37,20 @@ export const assetsApi = {
     return apiClient.get<ApiResponse<MarketData>>(`/assets/${code}/market-data`, {
       params: { asset_type: type }
     })
+  },
+
+  // 强制刷新单个资产的市场数据
+  refreshAsset: (id: number) => {
+    return apiClient.post<ApiResponse<Asset>>(`/assets/${id}/refresh`)
+  },
+
+  // 批量刷新所有资产的市场数据
+  batchRefreshAssets: () => {
+    return apiClient.post<ApiResponse<{
+      total_count: number
+      success_count: number
+      failed_count: number
+      failed_assets: Array<{ code: string; name: string }>
+    }>>('/assets/batch-refresh')
   }
 }

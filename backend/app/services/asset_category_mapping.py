@@ -31,7 +31,6 @@ from sqlalchemy.orm import Session
 from ..models.enums import AssetType, StrategyCategory
 from ..models.asset_category_mapping import AssetCategoryMapping as AssetCategoryMappingModel
 from ..schemas.asset_category_mapping import AssetCategoryMappingCreate, AssetCategoryMappingUpdate
-from .mock_data import mock_data_service
 
 
 class AssetCategoryMappingService:

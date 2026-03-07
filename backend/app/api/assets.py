@@ -3,8 +3,8 @@
 
 说明：
 - 创建资产时，name字段为可选
-- 如果未提供name，系统会从mock数据/akshare API获取资产名称
-- 这样可以简化用户操作，只需输入代码和基本信息即可
+- 如果未提供name，系统会从数据服务获取资产名称
+- 数据服务根据配置选择真实API或Mock数据
 """
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,7 +23,7 @@ from ..schemas.asset import (
 )
 from ..schemas.common import Response, PaginatedResponse
 from ..utils.auth import get_current_active_user
-from ..services.mock_data import mock_data_service
+from ..services.data_service import market_data_service
 from ..services.asset_category_mapping import asset_category_mapping_service
 
 router = APIRouter(prefix="/assets", tags=["资产"])
@@ -42,7 +42,7 @@ async def get_assets(
     # 更新资产的市场数据和策略分类
     for asset in assets:
         # 获取市场数据
-        market_data = mock_data_service.get_market_data(asset.code, asset.type)
+        market_data = market_data_service.get_market_data(asset.code, asset.type)
         if market_data:
             asset.current_price = market_data["price"]
             asset.market_value = asset.quantity * market_data["price"]
@@ -77,7 +77,7 @@ async def get_asset(
         )
 
     # 更新市场数据
-    market_data = mock_data_service.get_market_data(asset.code, asset.type)
+    market_data = market_data_service.get_market_data(asset.code, asset.type)
     if market_data:
         asset.current_price = market_data["price"]
         asset.market_value = asset.quantity * market_data["price"]
@@ -109,21 +109,21 @@ async def create_asset(
         )
 
     # 获取初始市场数据并验证代码是否有效
-    market_data = mock_data_service.get_market_data(asset.code, asset.type)
+    market_data = market_data_service.get_market_data(asset.code, asset.type)
 
     # 验证代码是否存在（市场数据或名称至少有一个存在）
-    if not market_data and not mock_data_service.get_asset_name(asset.code):
+    if not market_data and not market_data_service.get_asset_name(asset.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"无效的资产代码 '{asset.code}'：未找到对应的金融产品"
         )
 
-    # 如果未提供名称，从市场数据中获取
+    # 如果未提供名称，从数据服务中获取
     asset_name = asset.name
     if not asset_name:
-        asset_name = mock_data_service.get_asset_name(asset.code)
+        asset_name = market_data_service.get_asset_name(asset.code)
         if not asset_name and market_data:
-            # 如果mock数据中没有，尝试从market_data中获取
+            # 如果数据服务中没有，尝试从market_data中获取
             asset_name = market_data.get("name")
         # 如果还是没有，使用代码作为名称
         if not asset_name:
@@ -257,7 +257,7 @@ async def get_asset_market_data(
     db: Session = Depends(get_db)
 ):
     """获取资产市场数据"""
-    market_data = mock_data_service.get_market_data(asset_code, asset_type)
+    market_data = market_data_service.get_market_data(asset_code, asset_type)
 
     if not market_data:
         raise HTTPException(
@@ -266,3 +266,97 @@ async def get_asset_market_data(
         )
 
     return Response.success_response(data=MarketData(**market_data))
+
+
+@router.post("/{asset_id}/refresh", response_model=Response[AssetSchema])
+async def refresh_asset_data(
+    asset_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """强制刷新资产的市场数据"""
+    # 查询资产
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == current_user.id
+    ).first()
+
+    if not asset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="资产不存在"
+        )
+
+    # 强制刷新数据
+    refresh_success = market_data_service.force_refresh_asset(asset.code, asset.type)
+
+    if not refresh_success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="刷新市场数据失败"
+        )
+
+    # 更新资产的市场数据
+    market_data = market_data_service.get_market_data(asset.code, asset.type)
+    if market_data:
+        asset.current_price = market_data["price"]
+        asset.market_value = asset.quantity * market_data["price"]
+        asset.profit = (market_data["price"] - asset.cost_price) * asset.quantity
+        asset.profit_percent = ((market_data["price"] - asset.cost_price) / asset.cost_price) * 100
+
+    # 更新策略分类
+    asset.strategy_category = asset_category_mapping_service.get_effective_strategy_category(
+        db, current_user.id, asset.code, asset.type, asset.name
+    )
+
+    db.commit()
+    db.refresh(asset)
+
+    return Response.success_response(data=asset)
+
+
+@router.post("/batch-refresh", response_model=Response[dict])
+async def batch_refresh_assets(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """批量刷新所有资产的市场数据"""
+    # 查询用户所有资产
+    assets = db.query(Asset).filter(Asset.user_id == current_user.id).all()
+
+    success_count = 0
+    failed_count = 0
+    failed_assets = []
+
+    # 逐个刷新
+    for asset in assets:
+        refresh_success = market_data_service.force_refresh_asset(asset.code, asset.type)
+        if refresh_success:
+            success_count += 1
+            # 更新资产的市场数据
+            market_data = market_data_service.get_market_data(asset.code, asset.type)
+            if market_data:
+                asset.current_price = market_data["price"]
+                asset.market_value = asset.quantity * market_data["price"]
+                asset.profit = (market_data["price"] - asset.cost_price) * asset.quantity
+                asset.profit_percent = ((market_data["price"] - asset.cost_price) / asset.cost_price) * 100
+
+            # 更新策略分类
+            asset.strategy_category = asset_category_mapping_service.get_effective_strategy_category(
+                db, current_user.id, asset.code, asset.type, asset.name
+            )
+        else:
+            failed_count += 1
+            failed_assets.append({
+                'code': asset.code,
+                'name': asset.name
+            })
+
+    db.commit()
+
+    return Response.success_response(data={
+        'total_count': len(assets),
+        'success_count': success_count,
+        'failed_count': failed_count,
+        'failed_assets': failed_assets
+    })

@@ -4,7 +4,13 @@
       <template #header>
         <div class="card-header">
           <span>资产管理</span>
-          <el-button type="primary" @click="showAddDialog = true">添加资产</el-button>
+          <div class="header-actions">
+            <el-button type="primary" @click="showAddDialog = true">添加资产</el-button>
+            <el-button type="success" @click="handleBatchRefresh" :loading="loading" :disabled="assets.length === 0">
+              <el-icon><Refresh /></el-icon>
+              刷新数据
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -54,10 +60,16 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150">
+        <el-table-column label="操作" width="200">
           <template #default="{ row }">
-            <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row.id)">删除</el-button>
+            <div class="action-buttons">
+              <el-button size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button size="small" type="success" @click="handleRefreshSingle(row)" :loading="loading">
+                <el-icon><Refresh /></el-icon>
+                刷新
+              </el-button>
+              <el-button size="small" type="danger" @click="handleDelete(row.id)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -106,6 +118,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { useAssetsStore } from '@/store/assets'
 import type { Asset, AssetType, StrategyCategory, AssetStrategyCategoryUpdate } from '@/types'
 import { ASSET_TYPE_NAMES, STRATEGY_CATEGORY_NAMES } from '@/utils/constants'
@@ -225,6 +238,45 @@ async function handleStrategyCategoryChange(row: Asset, category: StrategyCatego
   }
 }
 
+async function handleRefreshSingle(asset: Asset) {
+  try {
+    ElMessage.info(`正在刷新资产 ${asset.name} 的市场数据...`)
+    const result = await assetsStore.refreshAsset(asset.id)
+    if (result.success) {
+      ElMessage.success('刷新成功')
+    } else {
+      ElMessage.error(result.error || '刷新失败')
+    }
+  } catch (error) {
+    console.error('Refresh asset failed:', error)
+  }
+}
+
+async function handleBatchRefresh() {
+  try {
+    ElMessage.info('正在批量刷新所有资产的市场数据...')
+    const result = await assetsStore.batchRefreshAssets()
+    if (result.success) {
+      if (result.data && result.data.failed_count > 0) {
+        ElMessage.warning(
+          `刷新完成：成功 ${result.data.success_count} 个，失败 ${result.data.failed_count} 个`,
+          { duration: 5000 }
+        )
+        if (result.data.failed_assets && result.data.failed_assets.length > 0) {
+          const failedNames = result.data.failed_assets.map(a => a.name).join('、')
+          ElMessage.warning(`失败资产：${failedNames}`, { duration: 5000 })
+        }
+      } else {
+        ElMessage.success(`刷新成功！共刷新 ${result.data.success_count} 个资产`)
+      }
+    } else {
+      ElMessage.error(result.error || '批量刷新失败')
+    }
+  } catch (error) {
+    console.error('Batch refresh failed:', error)
+  }
+}
+
 function formatAssetType(type: AssetType): string {
   return ASSET_TYPE_NAMES[type] || type
 }
@@ -244,6 +296,16 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
 }
 
 .positive {
