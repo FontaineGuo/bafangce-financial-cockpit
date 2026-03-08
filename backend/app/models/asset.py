@@ -3,7 +3,7 @@
 """
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 
 from ..core.database import Base
@@ -63,6 +63,12 @@ class Asset(Base):
     type = Column(String(20), nullable=False, comment="资产类型")
     strategy_category = Column(String(20), nullable=True, comment="策略分类")
     market = Column(String(10), nullable=False, default="CN", comment="市场")
+
+    # 手动价格设置相关字段
+    is_manually_set = Column(Boolean, default=False, comment="是否手动设置价格")
+    manual_set_price = Column(Float, nullable=True, comment="手动设置的价格")
+    manual_set_at = Column(DateTime, nullable=True, comment="手动设置时间")
+
     quantity = Column(Float, nullable=False, comment="持有数量")
     cost_price = Column(Float, nullable=False, comment="成本价")
     current_price = Column(Float, comment="当前价")

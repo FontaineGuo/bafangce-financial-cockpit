@@ -55,6 +55,9 @@ class AssetUpdate(BaseModel):
     market: Optional[str] = None
     quantity: Optional[float] = None
     cost_price: Optional[float] = None
+    is_manually_set: Optional[bool] = None
+    manual_set_price: Optional[float] = None
+    manual_set_at: Optional[datetime] = None
 
 
 class AssetStrategyCategoryUpdate(BaseModel):
@@ -72,6 +75,9 @@ class Asset(AssetBase):
     profit_percent: Optional[float] = None
     market_data: Optional[MarketData] = None
     strategy_category: Optional[str] = None
+    is_manually_set: Optional[bool] = None
+    manual_set_price: Optional[float] = None
+    manual_set_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

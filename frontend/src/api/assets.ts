@@ -1,5 +1,5 @@
 import apiClient from './index'
-import type { Asset, AssetCreate, AssetUpdate, AssetStrategyCategoryUpdate, MarketData, AssetType, ApiResponse } from '@/types'
+import type { Asset, AssetCreate, AssetUpdate, AssetStrategyCategoryUpdate, MarketData, AssetType, ApiResponse, ManualPriceUpdate } from '@/types'
 
 export const assetsApi = {
   // 获取资产列表
@@ -52,5 +52,10 @@ export const assetsApi = {
       failed_count: number
       failed_assets: Array<{ code: string; name: string }>
     }>>('/assets/batch-refresh')
+  },
+
+  // 手动设置资产当前价格
+  setCurrentPrice: (id: number, data: ManualPriceUpdate) => {
+    return apiClient.put<ApiResponse<Asset>>(`/assets/${id}/current-price`, data)
   }
 }

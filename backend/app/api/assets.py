@@ -6,7 +6,8 @@
 - 如果未提供name，系统会从数据服务获取资产名称
 - 数据服务根据配置选择真实API或Mock数据
 """
-from typing import List
+from datetime import datetime, timedelta
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -33,10 +34,17 @@ router = APIRouter(prefix="/assets", tags=["资产"])
 async def get_assets(
     skip: int = 0,
     limit: int = 100,
+    refresh: bool = False,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """获取资产列表"""
+    """获取资产列表
+
+    Args:
+        skip: 跳过的记录数
+        limit: 返回的记录数
+        refresh: 是否强制刷新数据（覆盖手动设置的价格）
+    """
     assets = db.query(Asset).filter(Asset.user_id == current_user.id).offset(skip).limit(limit).all()
 
     # 更新资产的市场数据和策略分类
@@ -44,10 +52,24 @@ async def get_assets(
         # 获取市场数据
         market_data = market_data_service.get_market_data(asset.code, asset.type)
         if market_data:
-            asset.current_price = market_data["price"]
-            asset.market_value = asset.quantity * market_data["price"]
-            asset.profit = (market_data["price"] - asset.cost_price) * asset.quantity
-            asset.profit_percent = ((market_data["price"] - asset.cost_price) / asset.cost_price) * 100
+            api_price = market_data["price"]
+
+            # 检查是否应该覆盖手动设置的价格
+            # 如果refresh=True，强制覆盖；否则使用智能判断逻辑
+            should_use_api_price = refresh or should_override_manual_price(asset, api_price)
+
+            if should_use_api_price:
+                # 使用API价格
+                asset.current_price = api_price
+                asset.market_value = asset.quantity * api_price
+                asset.profit = (api_price - asset.cost_price) * asset.quantity
+                asset.profit_percent = ((api_price - asset.cost_price) / asset.cost_price) * 100
+            else:
+                # 保持手动价格
+                asset.current_price = asset.manual_set_price
+                asset.market_value = asset.quantity * asset.manual_set_price
+                asset.profit = (asset.manual_set_price - asset.cost_price) * asset.quantity
+                asset.profit_percent = ((asset.manual_set_price - asset.cost_price) / asset.cost_price) * 100
 
         # 获取策略分类
         asset.strategy_category = asset_category_mapping_service.get_effective_strategy_category(
@@ -299,10 +321,23 @@ async def refresh_asset_data(
     # 更新资产的市场数据
     market_data = market_data_service.get_market_data(asset.code, asset.type)
     if market_data:
-        asset.current_price = market_data["price"]
-        asset.market_value = asset.quantity * market_data["price"]
-        asset.profit = (market_data["price"] - asset.cost_price) * asset.quantity
-        asset.profit_percent = ((market_data["price"] - asset.cost_price) / asset.cost_price) * 100
+        api_price = market_data["price"]
+
+        # 检查是否应该覆盖手动设置的价格（强制刷新时不覆盖，除非满足条件）
+        should_use_api_price = should_override_manual_price(asset, api_price)
+
+        if should_use_api_price:
+            # 使用API价格
+            asset.current_price = api_price
+            asset.market_value = asset.quantity * api_price
+            asset.profit = (api_price - asset.cost_price) * asset.quantity
+            asset.profit_percent = ((api_price - asset.cost_price) / asset.cost_price) * 100
+        else:
+            # 保持手动价格
+            asset.current_price = asset.manual_set_price
+            asset.market_value = asset.quantity * asset.manual_set_price
+            asset.profit = (asset.manual_set_price - asset.cost_price) * asset.quantity
+            asset.profit_percent = ((asset.manual_set_price - asset.cost_price) / asset.cost_price) * 100
 
     # 更新策略分类
     asset.strategy_category = asset_category_mapping_service.get_effective_strategy_category(
@@ -336,10 +371,23 @@ async def batch_refresh_assets(
             # 更新资产的市场数据
             market_data = market_data_service.get_market_data(asset.code, asset.type)
             if market_data:
-                asset.current_price = market_data["price"]
-                asset.market_value = asset.quantity * market_data["price"]
-                asset.profit = (market_data["price"] - asset.cost_price) * asset.quantity
-                asset.profit_percent = ((market_data["price"] - asset.cost_price) / asset.cost_price) * 100
+                api_price = market_data["price"]
+
+                # 检查是否应该覆盖手动设置的价格
+                should_use_api_price = should_override_manual_price(asset, api_price)
+
+                if should_use_api_price:
+                    # 使用API价格
+                    asset.current_price = api_price
+                    asset.market_value = asset.quantity * api_price
+                    asset.profit = (api_price - asset.cost_price) * asset.quantity
+                    asset.profit_percent = ((api_price - asset.cost_price) / asset.cost_price) * 100
+                else:
+                    # 保持手动价格
+                    asset.current_price = asset.manual_set_price
+                    asset.market_value = asset.quantity * asset.manual_set_price
+                    asset.profit = (asset.manual_set_price - asset.cost_price) * asset.quantity
+                    asset.profit_percent = ((asset.manual_set_price - asset.cost_price) / asset.cost_price) * 100
 
             # 更新策略分类
             asset.strategy_category = asset_category_mapping_service.get_effective_strategy_category(
@@ -358,5 +406,123 @@ async def batch_refresh_assets(
         'total_count': len(assets),
         'success_count': success_count,
         'failed_count': failed_count,
-        'failed_assets': failed_assets
+        'failed_assets': failed_assets,
+        'sync_status': 'completed'  # 数据同步状态
     })
+
+
+@router.get("/assets/sync-status", response_model=Response[dict])
+async def get_assets_sync_status(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """获取资产数据同步状态"""
+    # 查询用户资产，检查最后更新时间
+    assets = db.query(Asset).filter(Asset.user_id == current_user.id).all()
+
+    if not assets:
+        return Response.success_response(data={
+            'has_assets': False,
+            'total_assets': 0,
+            'last_update_time': None,
+            'sync_status': 'no_data'
+        })
+
+    # 找到最近更新的资产
+    latest_asset = max(assets, key=lambda a: a.updated_at or datetime.min)
+    last_update_time = latest_asset.updated_at if latest_asset.updated_at else None
+
+    return Response.success_response(data={
+        'has_assets': True,
+        'total_assets': len(assets),
+        'last_update_time': last_update_time,
+        'sync_status': 'completed' if last_update_time else 'pending',
+        'message': '数据已同步' if last_update_time else '等待首次数据更新'
+    })
+
+
+def should_override_manual_price(asset: Asset, api_price: float) -> bool:
+    """
+    判断是否应该用手动价格覆盖API价格
+
+    逻辑：
+    - 如果资产没有手动设置价格，返回True（使用API价格）
+    - 如果手动价格设置时间超过24小时，返回True（覆盖）
+    - 如果API价格与手动价格差异超过5%，返回True（覆盖）
+    - 否则返回False（保持手动价格）
+
+    Args:
+        asset: 资产对象
+        api_price: API返回的价格
+
+    Returns:
+        bool: 是否应该用手动价格覆盖API价格
+    """
+    # 如果没有手动设置价格，使用API价格
+    if not asset.is_manually_set or not asset.manual_set_price or not asset.manual_set_at:
+        return True
+
+    # 如果手动价格设置时间超过24小时，使用API价格
+    if datetime.utcnow() - asset.manual_set_at > timedelta(hours=24):
+        return True
+
+    # 如果价格差异超过5%，使用API价格
+    price_diff_percent = abs(api_price - asset.manual_set_price) / asset.manual_set_price * 100
+    if price_diff_percent > 5:
+        return True
+
+    # 保持手动价格
+    return False
+
+
+@router.put("/{asset_id}/current-price", response_model=Response[AssetSchema])
+async def set_asset_current_price(
+    asset_id: int,
+    price_data: dict,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """手动设置资产当前价格"""
+    # 查询资产
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == current_user.id
+    ).first()
+
+    if not asset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="资产不存在"
+        )
+
+    # 验证价格数据
+    current_price = price_data.get("current_price")
+    if current_price is None or current_price <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="当前价格必须大于0"
+        )
+
+    # 更新手动价格字段
+    asset.is_manually_set = True
+    asset.manual_set_price = current_price
+    asset.manual_set_at = datetime.utcnow()
+
+    # 使用手动价格更新当前价格和相关字段
+    asset.current_price = current_price
+    asset.market_value = asset.quantity * current_price
+    asset.profit = (current_price - asset.cost_price) * asset.quantity
+    asset.profit_percent = ((current_price - asset.cost_price) / asset.cost_price) * 100
+
+    db.commit()
+    db.refresh(asset)
+
+    # 更新策略分类
+    asset.strategy_category = asset_category_mapping_service.get_effective_strategy_category(
+        db, current_user.id, asset.code, asset.type, asset.name
+    )
+
+    db.commit()
+    db.refresh(asset)
+
+    return Response.success_response(data=asset)

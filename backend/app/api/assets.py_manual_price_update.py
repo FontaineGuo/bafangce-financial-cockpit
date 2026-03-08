@@ -1,0 +1,1 @@
+f:\GitRepos\bafangce-financial-cockpit\backend\app\api\assets.py_manual_price_update.py

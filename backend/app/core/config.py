@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # 数据缓存配置
     CACHE_ENABLED: bool = True
-    CACHE_DEFAULT_TTL: int = 3600  # 1小时
+    CACHE_DEFAULT_TTL: int = 43200  # 12小时
 
     # 数据源配置
     USE_REAL_DATA: bool = True  # True: 使用真实API数据, False: 使用Mock数据
