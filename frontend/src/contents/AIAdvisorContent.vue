@@ -10,7 +10,19 @@
         </div>
       </template>
 
-      <el-empty v-if="!loading && adviceList.length === 0" description="点击右上角生成AI建议" />
+      <el-empty v-if="!loading && adviceList.length === 0" description="点击右上角生成AI建议">
+        <template #description>
+          <div class="feature-not-available">
+            <el-icon size="40" color="#909399">
+              <Lock />
+            </el-icon>
+            <div class="feature-text">
+              <h3>该功能暂未开放</h3>
+              <p>敬请期待</p>
+            </div>
+          </div>
+        </template>
+      </el-empty>
 
       <div v-else class="advice-list">
         <div
@@ -47,6 +59,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Lock } from '@element-plus/icons-vue'
 
 const loading = ref(false)
 
@@ -170,6 +183,36 @@ async function generateAdvice() {
 }
 
 .asset-tag {
+  margin: 0;
+}
+
+.feature-not-available {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #909399;
+}
+
+.feature-not-available .el-icon {
+  margin-bottom: 20px;
+}
+
+.feature-text {
+  text-align: center;
+}
+
+.feature-text h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #303133;
+}
+
+.feature-text p {
+  font-size: 14px;
+  color: #606266;
   margin: 0;
 }
 </style>
