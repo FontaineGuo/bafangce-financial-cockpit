@@ -50,3 +50,5 @@ asset_allocation_report_*.html
 # Node modules
 node_modules/
 frontend/node_modules/
+
+.claude/
