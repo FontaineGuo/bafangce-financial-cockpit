@@ -87,6 +87,9 @@ export interface Asset {
   profit_percent?: number
   market_data?: MarketData
   strategy_category?: string
+  is_manually_set?: boolean
+  manual_set_price?: number
+  manual_set_at?: string
   created_at: string
   updated_at: string
 }
@@ -106,6 +109,14 @@ export interface AssetUpdate {
   market?: string
   quantity?: number
   cost_price?: number
+  current_price?: number
+  is_manually_set?: boolean
+  manual_set_price?: number
+  manual_set_at?: string
+}
+
+export interface ManualPriceUpdate {
+  current_price: number
 }
 
 // ==================== 资产分类映射相关类型 ====================

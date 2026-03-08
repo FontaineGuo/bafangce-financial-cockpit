@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Asset, AssetCreate, AssetUpdate, AssetStrategyCategoryUpdate } from '@/types'
+import type { Asset, AssetCreate, AssetUpdate, AssetStrategyCategoryUpdate, ManualPriceUpdate } from '@/types'
 import { assetsApi } from '@/api/assets'
 
 export const useAssetsStore = defineStore('assets', () => {
@@ -118,6 +118,21 @@ export const useAssetsStore = defineStore('assets', () => {
     await fetchAssets()
   }
 
+  async function setCurrentPrice(id: number, data: ManualPriceUpdate) {
+    try {
+      const response = await assetsApi.setCurrentPrice(id, data)
+      const index = assets.value.findIndex(a => a.id === id)
+      if (index !== -1) {
+        assets.value[index] = response.data.data!
+      }
+      return { success: true }
+    } catch (err: any) {
+      console.error('Set current price failed:', err)
+      const errorMessage = err.response?.data?.detail || '设置价格失败'
+      return { success: false, error: errorMessage }
+    }
+  }
+
   return {
     assets,
     loading,
@@ -129,6 +144,7 @@ export const useAssetsStore = defineStore('assets', () => {
     updateAssetStrategyCategory,
     refreshAsset,
     batchRefreshAssets,
-    refreshAssets
+    refreshAssets,
+    setCurrentPrice
   }
 })

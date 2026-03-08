@@ -24,7 +24,25 @@
         </el-table-column>
         <el-table-column prop="quantity" label="数量" width="100" />
         <el-table-column prop="cost_price" label="成本价" width="100" />
-        <el-table-column prop="current_price" label="现价" width="100" />
+        <el-table-column prop="current_price" label="现价" width="150">
+          <template #default="{ row }">
+            <div v-if="row.current_price" class="price-cell">
+              <span :class="{
+                'manual-price': row.is_manually_set,
+                'api-price': !row.is_manually_set
+              }">
+                {{ row.current_price.toFixed(4) }}
+              </span>
+              <el-tag v-if="row.is_manually_set" type="warning" size="small" class="price-tag">
+                手动
+              </el-tag>
+              <span v-if="row.manual_set_at" class="manual-set-time">
+                {{ formatDateTime(row.manual_set_at) }}
+              </span>
+            </div>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="market_value" label="市值" width="100" />
         <el-table-column prop="profit" label="盈亏" width="100">
           <template #default="{ row }">
@@ -60,10 +78,14 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200">
+        <el-table-column label="操作" width="280">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button size="small" type="primary" @click="handleEditPrice(row)">
+                <el-icon><Edit /></el-icon>
+                设置价格
+              </el-button>
               <el-button size="small" type="success" @click="handleRefreshSingle(row)" :loading="loading">
                 <el-icon><Refresh /></el-icon>
                 刷新
@@ -112,15 +134,61 @@
         <el-button type="primary" @click="handleSubmit" :loading="loading">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 手动设置价格对话框 -->
+    <el-dialog
+      v-model="showPriceDialog"
+      title="手动设置价格"
+      width="500px"
+    >
+      <div v-if="editingPriceAsset">
+        <el-form :model="priceForm" :rules="priceRules" ref="priceFormRef" label-width="100px">
+          <el-form-item label="资产代码">
+            <el-input v-model="editingPriceAsset.code" disabled />
+          </el-form-item>
+          <el-form-item label="资产名称">
+            <el-input v-model="editingPriceAsset.name" disabled />
+          </el-form-item>
+          <el-form-item label="当前价格" v-if="editingPriceAsset.current_price">
+            <el-input :value="formatPrice(editingPriceAsset.current_price)" disabled>
+              <template #append>
+                <span v-if="editingPriceAsset.is_manually_set" class="manual-price-badge">
+                  <el-tag type="warning" size="small">手动</el-tag>
+                </span>
+                <span v-else class="api-price-badge">
+                  <el-tag type="success" size="small">API</el-tag>
+                </span>
+              </template>
+            </el-input>
+          </el-form-item>
+          <el-form-item label="手动价格" prop="manual_set_price">
+            <el-input-number
+              v-model="priceForm.manual_set_price"
+              :min="0.01"
+              :precision="4"
+              :step="0.01"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item v-if="editingPriceAsset.manual_set_at" label="手动设置时间">
+            <el-input :value="formatDateTime(editingPriceAsset.manual_set_at)" disabled />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button @click="closePriceDialog">取消</el-button>
+        <el-button type="primary" @click="handleSubmitPrice" :loading="loading">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, Edit } from '@element-plus/icons-vue'
 import { useAssetsStore } from '@/store/assets'
-import type { Asset, AssetType, StrategyCategory, AssetStrategyCategoryUpdate } from '@/types'
+import type { Asset, AssetType, StrategyCategory, AssetStrategyCategoryUpdate, AssetUpdate } from '@/types'
 import { ASSET_TYPE_NAMES, STRATEGY_CATEGORY_NAMES } from '@/utils/constants'
 
 const assetsStore = useAssetsStore()
@@ -130,6 +198,21 @@ const editingAsset = ref<Asset | null>(null)
 const formRef = ref()
 const loading = computed(() => assetsStore.loading)
 const assets = computed(() => assetsStore.assets)
+
+// 价格设置相关
+const showPriceDialog = ref(false)
+const editingPriceAsset = ref<Asset | null>(null)
+const priceFormRef = ref()
+const priceForm = reactive({
+  manual_set_price: 0
+})
+
+const priceRules = {
+  manual_set_price: [
+    { required: true, message: '请输入价格', trigger: 'blur' },
+    { type: 'number', min: 0.01, message: '价格必须大于0', trigger: 'blur' }
+  ]
+}
 
 const form = reactive({
   code: '',
@@ -286,6 +369,52 @@ function formatStrategyCategory(category?: string): string {
   return STRATEGY_CATEGORY_NAMES[category as keyof typeof STRATEGY_CATEGORY_NAMES] || category
 }
 
+function formatPrice(price: number): string {
+  return price.toFixed(4)
+}
+
+function formatDateTime(dateStr?: string): string {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+function handleEditPrice(asset: Asset) {
+  editingPriceAsset.value = asset
+  priceForm.manual_set_price = asset.current_price || asset.manual_set_price || 0
+  showPriceDialog.value = true
+}
+
+function closePriceDialog() {
+  showPriceDialog.value = false
+  editingPriceAsset.value = null
+  priceForm.manual_set_price = 0
+}
+
+async function handleSubmitPrice() {
+  if (!priceFormRef.value || !editingPriceAsset.value) return
+
+  await priceFormRef.value.validate(async (valid: boolean) => {
+    if (valid) {
+      const result = await assetsStore.setCurrentPrice(editingPriceAsset.value.id, {
+        current_price: priceForm.manual_set_price
+      })
+      if (result.success) {
+        ElMessage.success('价格设置成功')
+        closePriceDialog()
+      } else {
+        ElMessage.error(result.error || '设置价格失败')
+      }
+    }
+  })
+}
+
 onMounted(() => {
   assetsStore.fetchAssets()
 })
@@ -314,5 +443,29 @@ onMounted(() => {
 
 .negative {
   color: #f56c6c;
+}
+
+.price-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.manual-price {
+  font-weight: bold;
+  color: #e6a23c;
+}
+
+.api-price {
+  color: #67c23a;
+}
+
+.price-tag {
+  margin-left: 4px;
+}
+
+.manual-set-time {
+  font-size: 11px;
+  color: #909399;
 }
 </style>
