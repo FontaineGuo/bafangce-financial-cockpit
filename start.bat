@@ -18,6 +18,23 @@ if %ERRORLEVEL% NEQ 0 (
 echo [成功] uv 已安装
 
 echo.
+echo [信息] 检查前端依赖...
+if not exist "frontend\node_modules" (
+    echo [警告] 前端依赖未安装，正在安装...
+    cd frontend
+    call npm install
+    cd ..
+    if %ERRORLEVEL% NEQ 0 (
+        echo [错误] 前端依赖安装失败
+        pause
+        exit /b 1
+    )
+    echo [成功] 前端依赖安装完成
+) else (
+    echo [成功] 前端依赖已安装
+)
+
+echo.
 echo [信息] 正在启动后端服务器...
 start "后端服务器" cmd /k "cd backend && uv run python run.py"
 
