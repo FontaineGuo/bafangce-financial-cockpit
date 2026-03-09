@@ -152,6 +152,11 @@
                 ¥{{ formatNumber(row.allocation_amount) }}
               </template>
             </el-table-column>
+            <el-table-column prop="asset_market_value" label="资产市值" width="150">
+              <template #default="{ row }">
+                ¥{{ row.asset_market_value !== undefined && row.asset_market_value !== null ? Number(row.asset_market_value).toFixed(3) : '-' }}
+              </template>
+            </el-table-column>
             <el-table-column label="操作" width="100">
               <template #default="{ row }">
                 <el-button size="small" type="danger" @click="handleRemoveAsset(row)">移除</el-button>
@@ -377,11 +382,11 @@ onMounted(() => {
 }
 
 .stat-value.positive {
-  color: #67c23a;
+  color: #f56c6c;
 }
 
 .stat-value.negative {
-  color: #f56c6c;
+  color: #67c23a;
 }
 
 .portfolio-description {

@@ -166,11 +166,11 @@ onMounted(async () => {
 }
 
 .stat-value.positive {
-  color: #67c23a;
+  color: #f56c6c;
 }
 
 .stat-value.negative {
-  color: #f56c6c;
+  color: #67c23a;
 }
 
 .stat-label {
