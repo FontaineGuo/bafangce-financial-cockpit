@@ -234,6 +234,11 @@
                 ¥{{ formatNumber(row.allocation_amount) }}
               </template>
             </el-table-column>
+            <el-table-column prop="asset_market_value" label="资产市值" width="150" sortable="custom">
+              <template #default="{ row }">
+                ¥{{ row.asset_market_value !== undefined && row.asset_market_value !== null ? Number(row.asset_market_value).toFixed(3) : '-' }}
+              </template>
+            </el-table-column>
             <el-table-column prop="profit" label="盈亏" width="120" sortable="custom">
               <template #default="{ row }">
                 <span v-if="row.asset_profit !== undefined" :class="{ positive: row.asset_profit > 0, negative: row.asset_profit < 0 }">
@@ -845,11 +850,11 @@ onMounted(async () => {
 }
 
 .stat-value.positive {
-  color: #67c23a;
+  color: #f56c6c !important;
 }
 
 .stat-value.negative {
-  color: #f56c6c;
+  color: #67c23a !important;
 }
 
 .portfolio-description {
