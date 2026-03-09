@@ -61,7 +61,7 @@ class Asset(Base):
     code = Column(String(20), unique=True, nullable=False, index=True, comment="资产代码")
     name = Column(String(100), nullable=False, comment="资产名称")
     type = Column(String(20), nullable=False, comment="资产类型")
-    strategy_category = Column(String(20), nullable=True, comment="策略分类")
+    strategy_category = Column(String(20), nullable=False, default=StrategyCategory.OTHER.value, comment="策略分类")
     market = Column(String(10), nullable=False, default="CN", comment="市场")
 
     # 手动价格设置相关字段

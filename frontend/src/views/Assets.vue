@@ -225,10 +225,10 @@ onMounted(() => {
 }
 
 .positive {
-  color: #f56c6c;
+  color: #f56c6c !important;
 }
 
 .negative {
-  color: #67c23a;
+  color: #67c23a !important;
 }
 </style>

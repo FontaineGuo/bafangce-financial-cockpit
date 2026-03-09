@@ -43,7 +43,11 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="market_value" label="市值" width="100" />
+        <el-table-column prop="market_value" label="市值" width="100">
+          <template #default="{ row }">
+            {{ row.market_value !== undefined && row.market_value !== null ? Number(row.market_value).toFixed(3) : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="profit" label="盈亏" width="100">
           <template #default="{ row }">
             <span :class="{ positive: row.profit > 0, negative: row.profit < 0 }">
@@ -78,7 +82,7 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280">
+        <el-table-column label="操作" width="360">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button size="small" @click="handleEdit(row)">编辑</el-button>
@@ -438,11 +442,11 @@ onMounted(() => {
 }
 
 .positive {
-  color: #67c23a;
+  color: #f56c6c !important;
 }
 
 .negative {
-  color: #f56c6c;
+  color: #67c23a !important;
 }
 
 .price-cell {

@@ -85,7 +85,7 @@ h2 {
 }
 
 .stat-value.positive {
-  color: #67c23a;
+  color: #f56c6c !important;
 }
 
 .stat-label {
