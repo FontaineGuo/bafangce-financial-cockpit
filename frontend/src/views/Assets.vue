@@ -17,20 +17,32 @@
           </template>
         </el-table-column>
         <el-table-column prop="quantity" label="数量" width="100" />
-        <el-table-column prop="cost_price" label="成本价" width="100" />
-        <el-table-column prop="current_price" label="现价" width="100" />
-        <el-table-column prop="market_value" label="市值" width="100" />
+        <el-table-column prop="cost_price" label="成本价" width="100">
+          <template #default="{ row }">
+            {{ row.cost_price !== undefined && row.cost_price !== null ? Number(row.cost_price).toFixed(4) : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="current_price" label="现价" width="100">
+          <template #default="{ row }">
+            {{ row.current_price !== undefined && row.current_price !== null ? Number(row.current_price).toFixed(4) : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="market_value" label="市值" width="100">
+          <template #default="{ row }">
+            {{ row.market_value !== undefined && row.market_value !== null ? Number(row.market_value).toFixed(3) : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="profit" label="盈亏" width="100">
           <template #default="{ row }">
             <span :class="{ positive: row.profit > 0, negative: row.profit < 0 }">
-              {{ row.profit ? row.profit.toFixed(2) : '-' }}
+              {{ row.profit !== undefined && row.profit !== null ? Number(row.profit).toFixed(2) : '-' }}
             </span>
           </template>
         </el-table-column>
         <el-table-column prop="profit_percent" label="盈亏%" width="100">
           <template #default="{ row }">
             <span :class="{ positive: row.profit_percent > 0, negative: row.profit_percent < 0 }">
-              {{ row.profit_percent ? row.profit_percent.toFixed(2) + '%' : '-' }}
+              {{ row.profit_percent !== undefined && row.profit_percent !== null ? Number(row.profit_percent).toFixed(2) + '%' : '-' }}
             </span>
           </template>
         </el-table-column>
@@ -39,7 +51,7 @@
             {{ formatStrategyCategory(row.strategy_category) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150">
+        <el-table-column label="操作" width="200">
           <template #default="{ row }">
             <el-button size="small" @click="handleEdit(row)">编辑</el-button>
             <el-button size="small" type="danger" @click="handleDelete(row.id)">删除</el-button>
@@ -66,11 +78,11 @@
         </el-form-item>
         <el-form-item label="类型" prop="type">
           <el-select v-model="form.type" placeholder="请选择资产类型">
-            <el-option label="股票" value="STOCK" />
-            <el-option label="LOF基金" value="LOF_FUND" />
-            <el-option label="ETF基金" value="ETF_FUND" />
-            <el-option label="开放式基金" value="OPEN_FUND" />
-            <el-option label="现金" value="CASH" />
+            <el-option label="股票" :value="AssetType.STOCK" />
+            <el-option label="LOF基金" :value="AssetType.LOF_FUND" />
+            <el-option label="ETF基金" :value="AssetType.ETF_FUND" />
+            <el-option label="开放式基金" :value="AssetType.OPEN_FUND" />
+            <el-option label="现金" :value="AssetType.CASH" />
           </el-select>
         </el-form-item>
         <el-form-item label="数量" prop="quantity">
@@ -92,8 +104,9 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAssetsStore } from '@/store/assets'
-import type { Asset, AssetType } from '@/types'
-import { ASSET_TYPE_NAMES, STRATEGY_CATEGORY_NAMES, getDefaultStrategyCategory } from '@/utils/constants'
+import type { Asset } from '@/types'
+import { ASSET_TYPE_NAMES, STRATEGY_CATEGORY_NAMES } from '@/utils/constants'
+import { AssetType } from '@/types'
 
 const assetsStore = useAssetsStore()
 
@@ -107,7 +120,7 @@ const assets = computed(() => assetsStore.assets)
 const form = reactive({
   code: '',
   name: '',
-  type: 'STOCK' as AssetType,
+  type: AssetType.STOCK,
   quantity: 0,
   cost_price: 0
 })
@@ -123,7 +136,7 @@ const rules = {
 function resetForm() {
   form.code = ''
   form.name = ''
-  form.type = 'STOCK'
+  form.type = AssetType.STOCK
   form.quantity = 0
   form.cost_price = 0
 }
@@ -212,10 +225,10 @@ onMounted(() => {
 }
 
 .positive {
-  color: #67c23a;
+  color: #f56c6c;
 }
 
 .negative {
-  color: #f56c6c;
+  color: #67c23a;
 }
 </style>

@@ -34,49 +34,16 @@ router = APIRouter(prefix="/assets", tags=["资产"])
 async def get_assets(
     skip: int = 0,
     limit: int = 100,
-    refresh: bool = False,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """获取资产列表
+    """获取资产列表（纯读取操作，不触发任何更新）
 
     Args:
         skip: 跳过的记录数
         limit: 返回的记录数
-        refresh: 是否强制刷新数据（覆盖手动设置的价格）
     """
     assets = db.query(Asset).filter(Asset.user_id == current_user.id).offset(skip).limit(limit).all()
-
-    # 更新资产的市场数据和策略分类
-    for asset in assets:
-        # 获取市场数据
-        market_data = market_data_service.get_market_data(asset.code, asset.type)
-        if market_data:
-            api_price = market_data["price"]
-
-            # 检查是否应该覆盖手动设置的价格
-            # 如果refresh=True，强制覆盖；否则使用智能判断逻辑
-            should_use_api_price = refresh or should_override_manual_price(asset, api_price)
-
-            if should_use_api_price:
-                # 使用API价格
-                asset.current_price = api_price
-                asset.market_value = asset.quantity * api_price
-                asset.profit = (api_price - asset.cost_price) * asset.quantity
-                asset.profit_percent = ((api_price - asset.cost_price) / asset.cost_price) * 100
-            else:
-                # 保持手动价格
-                asset.current_price = asset.manual_set_price
-                asset.market_value = asset.quantity * asset.manual_set_price
-                asset.profit = (asset.manual_set_price - asset.cost_price) * asset.quantity
-                asset.profit_percent = ((asset.manual_set_price - asset.cost_price) / asset.cost_price) * 100
-
-        # 获取策略分类
-        asset.strategy_category = asset_category_mapping_service.get_effective_strategy_category(
-            db, current_user.id, asset.code, asset.type, asset.name
-        )
-
-    db.commit()
     return Response.success_response(data=assets)
 
 
@@ -86,7 +53,7 @@ async def get_asset(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """获取单个资产"""
+    """获取单个资产（纯读取操作，不触发任何更新）"""
     asset = db.query(Asset).filter(
         Asset.id == asset_id,
         Asset.user_id == current_user.id
@@ -98,20 +65,6 @@ async def get_asset(
             detail="资产不存在"
         )
 
-    # 更新市场数据
-    market_data = market_data_service.get_market_data(asset.code, asset.type)
-    if market_data:
-        asset.current_price = market_data["price"]
-        asset.market_value = asset.quantity * market_data["price"]
-        asset.profit = (market_data["price"] - asset.cost_price) * asset.quantity
-        asset.profit_percent = ((market_data["price"] - asset.cost_price) / asset.cost_price) * 100
-
-    # 更新策略分类
-    asset.strategy_category = asset_category_mapping_service.get_effective_strategy_category(
-        db, current_user.id, asset.code, asset.type, asset.name
-    )
-
-    db.commit()
     return Response.success_response(data=asset)
 
 
