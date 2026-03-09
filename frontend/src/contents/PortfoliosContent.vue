@@ -182,12 +182,12 @@
                 <template #default="{ row }">
                   <span
                     v-if="row.deviation !== null && row.deviation !== undefined"
-                    :class="{
-                      'positive-deviation': row.deviation > 0,
-                      'negative-deviation': row.deviation < 0
+                    :style="{
+                      color: row.deviation > 0 ? '#f56c6c' : (row.deviation < 0 ? '#67c23a' : '#303133'),
+                      fontWeight: '500'
                     }"
                   >
-                    {{ row.deviation > 0 ? '+' : '' }}{{ row.deviation.toFixed(2) }}%
+                    {{ row.deviation >= 0 ? '+' : '' }}{{ row.deviation.toFixed(2) }}%
                   </span>
                   <span v-else>-</span>
                 </template>
@@ -971,12 +971,12 @@ onMounted(async () => {
 }
 
 .positive-deviation {
-  color: #f56c6c;
+  color: #f56c6c !important;
   font-weight: 500;
 }
 
 .negative-deviation {
-  color: #67c23a;
+  color: #67c23a !important;
   font-weight: 500;
 }
 
