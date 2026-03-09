@@ -801,15 +801,18 @@ async def get_strategy_comparison(
         category = allocation.category
         target_percentage = float(allocation.percentage)
         current_percentage = current_percentages.get(category, 0.0)
-        deviation = abs(current_percentage - target_percentage)
+        # 计算带符号的偏离值：正数表示高于目标，负数表示低于目标
+        deviation = current_percentage - target_percentage
+        # 使用绝对值来判断是否超出阈值
+        abs_deviation = abs(deviation)
         deviation_threshold = float(allocation.deviation_threshold)
 
         # 确定状态
-        if deviation == 0:
+        if abs_deviation == 0:
             status = "perfect"
-        elif deviation <= deviation_threshold:
+        elif abs_deviation <= deviation_threshold:
             status = "normal"
-        elif deviation <= deviation_threshold * 2:
+        elif abs_deviation <= deviation_threshold * 2:
             status = "warning"
         else:
             status = "danger"
@@ -817,9 +820,9 @@ async def get_strategy_comparison(
         # 更新摘要
         if status in ["warning", "danger"]:
             summary.categories_over_threshold += 1
-        if deviation > summary.max_deviation:
-            summary.max_deviation = deviation
-        summary.total_deviation += deviation
+        if abs_deviation > summary.max_deviation:
+            summary.max_deviation = abs_deviation
+        summary.total_deviation += abs_deviation
 
         comparison_items.append(StrategyComparisonItem(
             category=category,
