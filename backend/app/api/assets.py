@@ -124,20 +124,8 @@ async def create_asset(
     db.commit()
     db.refresh(db_asset)
 
-    # 自动创建分类映射
-    # 使用最终保存的资产名称进行分类
-    default_category = asset_category_mapping_service.get_default_strategy_category(asset.type, asset_name)
-    from ..models.asset_category_mapping import AssetCategoryMapping
-    mapping = AssetCategoryMapping(
-        user_id=current_user.id,
-        asset_code=asset.code,
-        asset_type=asset.type,
-        strategy_category=default_category,
-        is_user_override=False,
-        auto_mapped=True,
-    )
-    db.add(mapping)
-    db.commit()
+    # 移除自动策略分类映射逻辑，完全交给用户手动管理
+    # 用户可以通过专门的分类映射接口手动设置策略分类
 
     return Response.success_response(data=db_asset)
 
