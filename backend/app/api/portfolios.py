@@ -90,7 +90,6 @@ def _portfolio_asset_to_response(pa: PortfolioAsset, asset: Optional[Asset] = No
         portfolio_id=pa.portfolio_id,
         asset_id=pa.asset_id,
         current_weight=pa.current_weight,
-        allocation_amount=pa.allocation_amount,
         created_at=pa.created_at,
         updated_at=pa.updated_at,
         **asset_data

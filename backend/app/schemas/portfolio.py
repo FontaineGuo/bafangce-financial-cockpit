@@ -20,7 +20,6 @@ class PortfolioAssetResponse(PortfolioAssetBase):
     portfolio_id: int
     asset_id: int
     current_weight: float
-    allocation_amount: float
     asset_code: Optional[str] = Field(None, description="资产代码")
     asset_name: Optional[str] = Field(None, description="资产名称")
     strategy_category: Optional[str] = Field(None, description="策略分类")

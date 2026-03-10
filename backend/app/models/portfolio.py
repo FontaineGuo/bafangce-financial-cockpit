@@ -50,7 +50,6 @@ class PortfolioAsset(Base):
     portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True, comment="组合ID")
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False, index=True, comment="资产ID")
     current_weight = Column(Float, default=0, comment="当前权重（百分比）")
-    allocation_amount = Column(Float, default=0, comment="分配金额")
     created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
 
