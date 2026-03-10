@@ -95,7 +95,7 @@
     <el-dialog
       v-model="showDetailDialog"
       :title="`${currentPortfolio?.name} - 详情`"
-      width="1000px"
+      width="1300px"
       destroy-on-close
     >
       <div v-if="currentPortfolio" class="portfolio-detail">
@@ -227,11 +227,6 @@
             <el-table-column prop="current_weight" label="当前权重(%)" width="120" sortable="custom">
               <template #default="{ row }">
                 {{ (row.current_weight || 0).toFixed(2) }}%
-              </template>
-            </el-table-column>
-            <el-table-column prop="allocation_amount" label="分配金额" width="150" sortable="custom">
-              <template #default="{ row }">
-                ¥{{ formatNumber(row.allocation_amount) }}
               </template>
             </el-table-column>
             <el-table-column prop="asset_market_value" label="资产市值" width="150" sortable="custom">
@@ -461,10 +456,6 @@ const sortedAssets = computed(() => {
       case 'current_weight':
         valueA = a.current_weight || 0
         valueB = b.current_weight || 0
-        break
-      case 'allocation_amount':
-        valueA = a.allocation_amount || 0
-        valueB = b.allocation_amount || 0
         break
       case 'profit':
         valueA = a.asset_profit || 0
