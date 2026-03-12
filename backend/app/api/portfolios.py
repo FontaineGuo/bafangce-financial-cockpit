@@ -157,6 +157,10 @@ async def get_portfolio(
         asset = db.query(Asset).filter(Asset.id == pa.asset_id).first()
         assets_data.append(_portfolio_asset_to_response(pa, asset))
 
+    # 重新计算投资组合统计数据，确保市值等信息是最新的
+    _calculate_portfolio_stats(db, portfolio_id)
+    db.refresh(portfolio)
+
     portfolio_dict = {
         "id": portfolio.id,
         "user_id": portfolio.user_id,
