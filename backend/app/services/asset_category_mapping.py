@@ -25,6 +25,9 @@
 - 然后通过基金名称中的关键字进行二次分类，确定债券基金的具体策略分类
 - 用户可以通过自定义映射覆盖系统默认分类
 """
+import logging
+
+logger = logging.getLogger(__name__)
 from typing import Dict, Optional
 from sqlalchemy.orm import Session
 
@@ -240,6 +243,18 @@ class AssetCategoryMappingService:
         asset_name: str = ""
     ) -> StrategyCategory:
         """获取有效的策略分类（优先使用用户自定义覆盖）"""
+        # 首先从资产表中获取用户已设置的策略分类
+        from ..models.asset import Asset
+        asset = db.query(Asset).filter(
+            Asset.code == asset_code,
+            Asset.user_id == user_id
+        ).first()
+
+        # 如果资产表中用户已经设置了策略分类，直接使用用户设置
+        if asset and asset.strategy_category and asset.strategy_category != StrategyCategory.OTHER.value:
+            logger.info(f"使用用户设置的策略分类: {asset_code} -> {asset.strategy_category}")
+            return StrategyCategory(asset.strategy_category)
+
         # 首先查找用户自定义映射
         user_mapping = cls.get_user_mapping(db, user_id, asset_code)
         if user_mapping and user_mapping.is_user_override:
